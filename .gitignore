@@ -1,0 +1,14 @@
+# Android / Gradle
+.gradle/
+build/
+*/build/
+local.properties
+*.iml
+.idea/
+.cxx/
+
+# 设计工具链虚拟环境
+.venv/
+
+# 系统文件
+.DS_Store

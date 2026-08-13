@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MyLauncher — 可交互原型</title>
+<style>
+  :root {
+    --icon-size: 38px;
+    --font-size: 26px;
+    --row-pad: 10px;
+    --fg: #fff;
+    --fg70: rgba(255,255,255,.7);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--fg);
+    user-select:none;
+    -webkit-user-select:none;
+  }
+
+  /* ===== 高清锐利撞色壁纸(无模糊) ===== */
+  .wp {
+    background: repeating-linear-gradient(65deg,
+      #120e2c 0%,    #120e2c 20%,
+      #ff3d00 20%,   #ff3d00 23.5%,
+      #1a123a 23.5%, #1a123a 36.5%,
+      #00e5c8 36.5%, #00e5c8 38.1%,
+      #0e0b24 38.1%, #0e0b24 62.1%,
+      #ff008c 62.1%, #ff008c 67.6%,
+      #161032 67.6%, #161032 77.6%,
+      #ccff00 77.6%, #ccff00 78.8%,
+      #100c28 78.8%, #100c28 96.8%,
+      #ff5e3a 96.8%, #ff5e3a 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .wp-line { position:absolute; left:-25%; width:150%; pointer-events:none; }
+  .wp-line.a { top:16%; height:5px; background:#ccff00; transform:rotate(-24deg); }
+  .wp-line.b { top:19%; height:2px; background:#fff;   transform:rotate(-24deg); }
+  .wp-line.c { top:78%; height:4px; background:#00e5c8; transform:rotate(-24deg); }
+  .wp-ring {
+    position:absolute; width:52vmin; height:52vmin; border-radius:50%;
+    border:8px solid #ffd600; top:-18vmin; right:-14vmin; pointer-events:none;
+  }
+
+  /* ===== 主屏 ===== */
+  #screen { position:fixed; inset:0; display:flex; flex-direction:column; }
+  .statusbar {
+    position:absolute; top:10px; right:16px; font-size:13px; font-weight:600;
+    display:flex; gap:8px; align-items:center; z-index:5;
+  }
+  .battery { width:20px; height:11px; border:1.5px solid #fff; border-radius:3px; position:relative; }
+  .battery::after { content:""; position:absolute; right:-4px; top:2.5px; width:2px; height:4px; background:#fff; }
+  .battery i { position:absolute; left:1.5px; top:1.5px; bottom:1.5px; width:70%; background:#fff; }
+
+  .clock { text-align:center; margin-top:9vh; pointer-events:none; }
+  .clock .time { font-size:min(26vw, 120px); font-weight:100; line-height:1; letter-spacing:-1px; }
+  .clock .date { font-size:18px; font-weight:300; color:var(--fg70); margin-top:10px; }
+
+  .list { margin-top:4.5vh; padding:0 26px; overflow-y:auto; flex:1; scrollbar-width:none; }
+  .list::-webkit-scrollbar { display:none; }
+
+  .row { display:flex; align-items:center; gap:16px; padding:var(--row-pad) 0; cursor:pointer; }
+  .row:active { opacity:.55; }
+  .ic {
+    width:var(--icon-size); height:var(--icon-size); flex:0 0 var(--icon-size);
+    background:rgba(255,255,255,.16); border-radius:24%;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ic svg { width:62%; height:62%; }
+  .name { font-size:var(--font-size); font-weight:900; line-height:1.1; letter-spacing:.5px; }
+  .no-icons .ic { display:none; }
+
+  .row.add .name { font-weight:300; color:var(--fg70); }
+  .row.add .ic { background:transparent; border:1.5px dashed rgba(255,255,255,.5); }
+
+  .count { text-align:center; font-size:12px; letter-spacing:2px; color:var(--fg70); padding:12px 0 16px; }
+
+  #gear {
+    position:absolute; right:14px; bottom:14px; z-index:6;
+    width:40px; height:40px; border-radius:50%; border:none;
+    background:rgba(255,255,255,.18); color:#fff; font-size:19px; cursor:pointer;
+  }
+
+  /* ===== 横屏:图标一列垂线对齐 / 名称一列右对齐 ===== */
+  @media (orientation: landscape) {
+    .clock { position:absolute; left:30px; bottom:22px; margin:0; text-align:left; }
+    .clock .time { font-size:min(15vh, 84px); }
+    .clock .date { font-size:15px; margin-top:6px; }
+    .list { margin:0 0 0 auto; padding:18px 30px; width:52%; }
+    .row { justify-content:flex-end; padding:7px 0; }
+    .row .name { width:5.5em; text-align:right; flex:0 0 auto; }
+    .row .ic { order:-1; margin-right:18px; }
+    .row.add .name { width:5.5em; }
+    .count { display:none; }
+  }
+
+  /* ===== 长按菜单 ===== */
+  #menu {
+    position:fixed; z-index:50; min-width:160px;
+    background:#fafafc; color:#1e1e22; border-radius:14px;
+    box-shadow:0 10px 34px rgba(0,0,0,.45); overflow:hidden;
+  }
+  #menu .mi { padding:13px 22px; font-size:15px; cursor:pointer; }
+  #menu .mi + .mi { border-top:1px solid rgba(0,0,0,.08); }
+  #menu .mi:active { background:rgba(0,0,0,.06); }
+
+  /* ===== 全量应用选择器(与主屏同款样式) ===== */
+  #picker { position:fixed; inset:0; z-index:40; display:flex; flex-direction:column; }
+  #picker .ptitle { text-align:center; font-size:26px; font-weight:900; margin-top:7vh; }
+  #picker .psub { text-align:center; font-size:12px; color:var(--fg70); margin-top:8px; letter-spacing:1px; }
+  #picker .plist { margin-top:3vh; padding:0 26px; overflow-y:auto; flex:1; scrollbar-width:none; }
+  #picker .plist::-webkit-scrollbar { display:none; }
+
+  /* ===== 设置面板 ===== */
+  #settings {
+    position:fixed; right:14px; bottom:64px; z-index:60; width:250px;
+    background:#fafafc; color:#1e1e22; border-radius:16px; padding:18px;
+    box-shadow:0 10px 34px rgba(0,0,0,.45); font-size:14px;
+  }
+  #settings .stit { font-weight:700; margin-bottom:12px; }
+  #settings label { display:flex; justify-content:space-between; align-items:center; margin:10px 0; gap:10px; }
+  #settings input[type=range] { width:120px; }
+  #settings .sreset { margin-top:12px; width:100%; padding:9px; border:none; border-radius:9px;
+    background:#1e1e22; color:#fff; font-size:14px; cursor:pointer; }
+
+  .hidden { display:none !important; }
+  input.rename {
+    font:inherit; font-size:var(--font-size); font-weight:900; color:#fff;
+    background:transparent; border:none; border-bottom:2px solid #fff; outline:none; width:8em;
+  }
+</style>
+</head>
+<body>
+
+<div id="screen" class="wp">
+  <div class="wp-line a"></div><div class="wp-line b"></div><div class="wp-line c"></div>
+  <div class="wp-ring"></div>
+  <div class="statusbar"><span>5G</span><span class="battery"><i></i></span></div>
+  <div class="clock">
+    <div class="time" id="time">--:--</div>
+    <div class="date" id="date"></div>
+  </div>
+  <div class="list" id="list"></div>
+  <div class="count" id="count"></div>
+  <button id="gear">⚙</button>
+</div>
+
+<div id="menu" class="hidden">
+  <div class="mi" data-act="replace">替换应用</div>
+  <div class="mi" data-act="rename">修改名称</div>
+  <div class="mi" data-act="remove">移除</div>
+</div>
+
+<div id="picker" class="wp hidden">
+  <div class="wp-line a"></div><div class="wp-line c"></div>
+  <div class="wp-ring"></div>
+  <div class="ptitle">选择应用</div>
+  <div class="psub" id="psub"></div>
+  <div class="plist" id="plist"></div>
+</div>
+
+<div id="settings" class="hidden">
+  <div class="stit">显示设置</div>
+  <label>图标大小 <input type="range" id="sIcon" min="24" max="56" step="2"></label>
+  <label>字体大小 <input type="range" id="sFont" min="18" max="40" step="1"></label>
+  <label>显示图标 <input type="checkbox" id="sShowIcon" checked></label>
+  <button class="sreset" id="sReset">恢复默认布局</button>
+</div>
+
+<script>
+/* ============ 图标(白色单色 SVG,模拟 App 原图标的单色化) ============ */
+const F = 'fill="#fff"', S = 'fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+const ICONS = {
+  phone:    `<path ${F} d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/>`,
+  message:  `<path ${S} d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4V6a2 2 0 0 1 2-2z"/>`,
+  browser:  `<circle ${S} cx="12" cy="12" r="9"/><ellipse ${S} cx="12" cy="12" rx="4" ry="9"/><path ${S} d="M3 12h18"/>`,
+  camera:   `<rect ${S} x="3" y="7" width="18" height="13" rx="2.5"/><path ${S} d="M8.5 7l1.5-2.5h4L15.5 7"/><circle ${S} cx="12" cy="13.5" r="3.5"/>`,
+  photos:   `<rect ${S} x="3" y="4" width="18" height="16" rx="2"/><circle ${S} cx="16.5" cy="9" r="1.6"/><path ${S} d="M4 18l5-5 3.5 3.5L16 13l4 4"/>`,
+  music:    `<path ${S} d="M9 18V6l10-2v11"/><circle ${F} cx="6.8" cy="18" r="2.6"/><circle ${F} cx="16.8" cy="15" r="2.6"/>`,
+  mail:     `<rect ${S} x="3" y="5" width="18" height="14" rx="2"/><path ${S} d="M3 7l9 6 9-6"/>`,
+  maps:     `<path ${F} d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/>`,
+  calendar: `<rect ${S} x="3" y="5" width="18" height="16" rx="2"/><path ${S} d="M3 10h18M8 3v4M16 3v4"/>`,
+  notes:    `<rect ${S} x="5" y="3" width="14" height="18" rx="2"/><path ${S} d="M9 8h6M9 12h6M9 16h4"/>`,
+  clock:    `<circle ${S} cx="12" cy="12" r="9"/><path ${S} d="M12 7v5l3.5 2"/>`,
+  settings: `<circle ${S} cx="12" cy="12" r="3.2"/><path ${S} d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/>`,
+  wechat:   `<rect ${S} x="3" y="4.5" width="13" height="9" rx="4.5"/><rect ${S} x="9.5" y="10.5" width="11" height="8" rx="4"/>`,
+  shop:     `<path ${S} d="M5 8h14l-1.2 12.5H6.2L5 8z"/><path ${S} d="M9 10V6.5a3 3 0 0 1 6 0V10"/>`,
+  video:    `<rect ${S} x="3" y="5" width="18" height="14" rx="3"/><path ${F} d="M10 9.2l5.5 2.8-5.5 2.8z"/>`,
+  book:     `<path ${S} d="M4 5c2.7-1 5.3-1 8 1 2.7-2 5.3-2 8-1v13c-2.7-1-5.3-1-8 1-2.7-2-5.3-2-8-1z"/>`,
+  game:     `<rect ${S} x="2.5" y="8" width="19" height="9" rx="4.5"/><path ${S} d="M7.5 10.8v3.4M5.8 12.5h3.4"/><circle ${F} cx="15.6" cy="11.6" r="1"/><circle ${F} cx="18" cy="13.6" r="1"/>`,
+};
+const svg = k => `<svg viewBox="0 0 24 24">${ICONS[k] || ICONS.settings}</svg>`;
+
+/* ============ 数据 ============ */
+const MAX_APPS = 20;
+const ALL_APPS = [
+  ["phone","电话"],["message","信息"],["browser","浏览器"],["camera","相机"],
+  ["photos","相册"],["music","音乐"],["mail","邮件"],["maps","地图"],
+  ["calendar","日历"],["notes","便签"],["clock","时钟"],["settings","设置"],
+  ["wechat","微信"],["video","抖音"],["browser","微博"],["shop","支付宝"],
+  ["video","哔哩哔哩"],["book","微信读书"],["game","游戏中心"],["mail","Gmail"],
+  ["photos","小红书"],["shop","淘宝"],["music","网易云音乐"],["maps","高德地图"],
+];
+const DEFAULT_HOME = ALL_APPS.slice(0, 12);
+
+let home, prefs;
+try { home = JSON.parse(localStorage.getItem("ml_home")) || DEFAULT_HOME.map(a => [...a]); }
+catch { home = DEFAULT_HOME.map(a => [...a]); }
+try { prefs = JSON.parse(localStorage.getItem("ml_prefs")) || {}; } catch { prefs = {}; }
+prefs = Object.assign({ icon: 38, font: 26, showIcon: true }, prefs);
+
+const save = () => {
+  localStorage.setItem("ml_home", JSON.stringify(home));
+  localStorage.setItem("ml_prefs", JSON.stringify(prefs));
+};
+
+/* ============ 渲染主屏 ============ */
+const listEl = document.getElementById("list");
+const countEl = document.getElementById("count");
+
+function render() {
+  document.documentElement.style.setProperty("--icon-size", prefs.icon + "px");
+  document.documentElement.style.setProperty("--font-size", prefs.font + "px");
+  document.getElementById("screen").classList.toggle("no-icons", !prefs.showIcon);
+
+  listEl.innerHTML = "";
+  home.forEach(([icon, name], i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.draggable = true;
+    row.dataset.idx = i;
+    row.innerHTML = `<div class="ic">${svg(icon)}</div><div class="name">${name}</div>`;
+    listEl.appendChild(row);
+  });
+  if (home.length < MAX_APPS) {
+    const add = document.createElement("div");
+    add.className = "row add";
+    add.innerHTML = `<div class="ic"><svg viewBox="0 0 24 24"><path ${S} d="M12 5v14M5 12h14"/></svg></div><div class="name">添加应用</div>`;
+    add.addEventListener("click", () => openPicker(app => { home.push(app); save(); render(); }));
+    listEl.appendChild(add);
+  }
+  countEl.textContent = `— ${home.length} / ${MAX_APPS} —`;
+}
+
+/* ============ 时钟 ============ */
+function tick() {
+  const n = new Date();
+  const p = v => String(v).padStart(2, "0");
+  document.getElementById("time").textContent = `${p(n.getHours())}:${p(n.getMinutes())}`;
+  const week = "日一二三四五六"[n.getDay()];
+  document.getElementById("date").textContent = `星期${week} · ${n.getMonth() + 1}月${n.getDate()}日`;
+}
+tick(); setInterval(tick, 1000);
+
+/* ============ 长按菜单 ============ */
+const menu = document.getElementById("menu");
+let menuIdx = -1, pressTimer = null;
+
+function openMenu(idx, x, y) {
+  menuIdx = idx;
+  menu.classList.remove("hidden");
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = Math.min(x, innerWidth - mw - 10) + "px";
+  menu.style.top  = Math.min(y, innerHeight - mh - 10) + "px";
+}
+const closeMenu = () => { menu.classList.add("hidden"); menuIdx = -1; };
+
+listEl.addEventListener("pointerdown", e => {
+  const row = e.target.closest(".row");
+  if (!row || row.classList.contains("add")) return;
+  pressTimer = setTimeout(() => openMenu(+row.dataset.idx, e.clientX, e.clientY), 480);
+});
+["pointerup", "pointermove", "pointercancel"].forEach(ev =>
+  listEl.addEventListener(ev, () => clearTimeout(pressTimer)));
+listEl.addEventListener("contextmenu", e => {
+  const row = e.target.closest(".row");
+  if (!row || row.classList.contains("add")) return;
+  e.preventDefault();
+  openMenu(+row.dataset.idx, e.clientX, e.clientY);
+});
+document.addEventListener("pointerdown", e => {
+  if (!menu.contains(e.target)) closeMenu();
+  if (!document.getElementById("settings").contains(e.target) && e.target.id !== "gear")
+    document.getElementById("settings").classList.add("hidden");
+});
+
+menu.addEventListener("click", e => {
+  const act = e.target.dataset.act;
+  if (act === undefined || menuIdx < 0) return;
+  const i = menuIdx;
+  closeMenu();
+  if (act === "remove") { home.splice(i, 1); save(); render(); }
+  else if (act === "replace") openPicker(app => { home[i] = app; save(); render(); });
+  else if (act === "rename") startRename(i);
+});
+
+function startRename(i) {
+  const row = listEl.querySelector(`.row[data-idx="${i}"] .name`);
+  if (!row) return;
+  const input = document.createElement("input");
+  input.className = "rename";
+  input.value = home[i][1];
+  input.maxLength = 12;
+  row.replaceWith(input);
+  input.focus(); input.select();
+  const done = ok => { if (ok && input.value.trim()) home[i][1] = input.value.trim(); save(); render(); };
+  input.addEventListener("blur", () => done(true));
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") done(false);
+  });
+}
+
+/* ============ 全量应用选择器 ============ */
+const picker = document.getElementById("picker");
+const plist = document.getElementById("plist");
+let pickCb = null;
+
+function openPicker(cb) {
+  pickCb = cb;
+  document.getElementById("psub").textContent = `共 ${ALL_APPS.length} 个应用 · 点选即替换`;
+  plist.innerHTML = "";
+  ALL_APPS.forEach(([icon, name]) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<div class="ic">${svg(icon)}</div><div class="name">${name}</div>`;
+    row.addEventListener("click", () => {
+      picker.classList.add("hidden");
+      if (pickCb) pickCb([icon, name]);
+    });
+    plist.appendChild(row);
+  });
+  picker.classList.remove("hidden");
+}
+picker.addEventListener("contextmenu", e => e.preventDefault());
+// 点标题区空白处关闭选择器
+picker.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".row") && !e.target.closest(".ptitle") && !e.target.closest(".psub"))
+    picker.classList.add("hidden");
+});
+
+/* ============ 设置 ============ */
+const settings = document.getElementById("settings");
+const sIcon = document.getElementById("sIcon");
+const sFont = document.getElementById("sFont");
+const sShowIcon = document.getElementById("sShowIcon");
+document.getElementById("gear").addEventListener("click", () => {
+  sIcon.value = prefs.icon; sFont.value = prefs.font; sShowIcon.checked = prefs.showIcon;
+  settings.classList.toggle("hidden");
+});
+sIcon.addEventListener("input", () => { prefs.icon = +sIcon.value; save(); render(); });
+sFont.addEventListener("input", () => { prefs.font = +sFont.value; save(); render(); });
+sShowIcon.addEventListener("change", () => { prefs.showIcon = sShowIcon.checked; save(); render(); });
+document.getElementById("sReset").addEventListener("click", () => {
+  home = DEFAULT_HOME.map(a => [...a]);
+  prefs = { icon: 38, font: 26, showIcon: true };
+  save(); render();
+  settings.classList.add("hidden");
+});
+
+/* ============ 拖拽排序(桌面端) ============ */
+let dragIdx = -1;
+listEl.addEventListener("dragstart", e => {
+  const row = e.target.closest(".row");
+  if (!row || row.classList.contains("add")) return;
+  dragIdx = +row.dataset.idx;
+  e.dataTransfer.effectAllowed = "move";
+});
+listEl.addEventListener("dragover", e => e.preventDefault());
+listEl.addEventListener("drop", e => {
+  e.preventDefault();
+  const row = e.target.closest(".row");
+  if (!row || row.classList.contains("add") || dragIdx < 0) return;
+  const to = +row.dataset.idx;
+  const [moved] = home.splice(dragIdx, 1);
+  home.splice(to, 0, moved);
+  dragIdx = -1;
+  save(); render();
+});
+
+render();
+</script>
+</body>
+</html>
