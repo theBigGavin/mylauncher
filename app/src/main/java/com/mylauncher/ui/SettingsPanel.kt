@@ -1,5 +1,10 @@
 package com.mylauncher.ui
 
+import android.app.WallpaperManager
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
+import com.mylauncher.data.HomeStore
 import kotlin.math.roundToInt
 
 /** 设置面板:图标大小 / 字号滑杆(实时生效)、显示图标开关、恢复默认布局。 */
@@ -55,9 +62,11 @@ fun SettingsPanel(
     iconSize: Int,
     fontSize: Int,
     showIcons: Boolean,
+    wallpaperMode: String,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onShowIcons: (Boolean) -> Unit,
+    onWallpaperMode: (String) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -116,6 +125,45 @@ fun SettingsPanel(
             SettingRow("显示图标") {
                 MiniSwitch(checked = showIcons, onChange = onShowIcons)
             }
+
+            Spacer(Modifier.height(4.dp))
+            BasicText(
+                text = "壁纸",
+                style = TextStyle(
+                    color = Color(0xFF1E1E22),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            )
+            WallpaperOption(
+                label = "内置几何壁纸",
+                selected = wallpaperMode == HomeStore.WALLPAPER_BUILTIN,
+                onClick = { onWallpaperMode(HomeStore.WALLPAPER_BUILTIN) },
+            )
+            WallpaperOption(
+                label = "跟随系统壁纸",
+                selected = wallpaperMode == HomeStore.WALLPAPER_SYSTEM,
+                onClick = { onWallpaperMode(HomeStore.WALLPAPER_SYSTEM) },
+            )
+            if (wallpaperMode == HomeStore.WALLPAPER_SYSTEM) {
+                val context = LocalContext.current
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(Color(0x331E1E22))
+                        .clickable { openWallpaperPicker(context) }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicText(
+                        text = "更换壁纸…",
+                        style = TextStyle(color = Color(0xFF1E1E22), fontSize = 14.sp),
+                    )
+                }
+            }
+
             Spacer(Modifier.height(12.dp))
             Box(
                 Modifier
@@ -150,6 +198,58 @@ private fun SettingRow(label: String, content: @Composable () -> Unit) {
         )
         content()
     }
+}
+
+/** 壁纸模式选项行:左侧选中指示圆点 + 文字。 */
+@Composable
+private fun WallpaperOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(if (selected) Color(0xFF1E1E22) else Color(0x1F000000))
+        )
+        Spacer(Modifier.width(10.dp))
+        BasicText(
+            text = label,
+            style = TextStyle(
+                color = Color(0xFF1E1E22),
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            ),
+        )
+    }
+}
+
+/**
+ * 拉起系统壁纸选择器。
+ * 优先 ACTION_SET_WALLPAPER;ROM 不支持时降级 ACTION_CHANGE_LIVE_WALLPAPER;
+ * 再不支持则 Toast 提示(getCropAndSetWallpaperIntent 需要自带图片 Uri,此处不适用)。
+ */
+private fun openWallpaperPicker(context: Context) {
+    val candidates = listOf(
+        Intent(Intent.ACTION_SET_WALLPAPER),
+        Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER),
+    )
+    for (intent in candidates) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: ActivityNotFoundException) {
+            // 尝试下一个
+        } catch (e: Exception) {
+            // 部分 ROM 会抛 SecurityException 等,同样降级
+        }
+    }
+    Toast.makeText(context, "无法打开系统壁纸选择器", Toast.LENGTH_SHORT).show()
 }
 
 /** 极简自绘滑杆:轨道 + 滑块,支持点按与拖动。 */

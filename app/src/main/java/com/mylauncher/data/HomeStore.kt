@@ -20,6 +20,7 @@ data class HomeData(
     val iconSizeDp: Int,
     val fontSizeSp: Int,
     val showIcons: Boolean,
+    val wallpaperMode: String,
 )
 
 class HomeStore(private val context: Context) {
@@ -29,11 +30,15 @@ class HomeStore(private val context: Context) {
         const val DEFAULT_ICON_DP = 38
         const val DEFAULT_FONT_SP = 26
 
+        const val WALLPAPER_BUILTIN = "builtin"
+        const val WALLPAPER_SYSTEM = "system"
+
         private val KEY_ENTRIES = stringPreferencesKey("home_entries")
         private val KEY_INIT = booleanPreferencesKey("initialized")
         private val KEY_ICON = intPreferencesKey("icon_size_dp")
         private val KEY_FONT = intPreferencesKey("font_size_sp")
         private val KEY_SHOW_ICONS = booleanPreferencesKey("show_icons")
+        private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
     }
 
     val data: Flow<HomeData> = context.homeDataStore.data.map { p ->
@@ -43,6 +48,7 @@ class HomeStore(private val context: Context) {
             iconSizeDp = p[KEY_ICON] ?: DEFAULT_ICON_DP,
             fontSizeSp = p[KEY_FONT] ?: DEFAULT_FONT_SP,
             showIcons = p[KEY_SHOW_ICONS] ?: true,
+            wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
         )
     }
 
@@ -65,6 +71,12 @@ class HomeStore(private val context: Context) {
         context.homeDataStore.edit { it[KEY_SHOW_ICONS] = value }
     }
 
+    suspend fun setWallpaperMode(value: String) {
+        context.homeDataStore.edit {
+            it[KEY_WALLPAPER] = if (value == WALLPAPER_SYSTEM) WALLPAPER_SYSTEM else WALLPAPER_BUILTIN
+        }
+    }
+
     suspend fun resetAll(defaultEntries: List<StoredEntry>) {
         context.homeDataStore.edit {
             it[KEY_ENTRIES] = serialize(defaultEntries.take(MAX_APPS))
@@ -72,6 +84,7 @@ class HomeStore(private val context: Context) {
             it[KEY_ICON] = DEFAULT_ICON_DP
             it[KEY_FONT] = DEFAULT_FONT_SP
             it[KEY_SHOW_ICONS] = true
+            it[KEY_WALLPAPER] = WALLPAPER_BUILTIN
         }
     }
 

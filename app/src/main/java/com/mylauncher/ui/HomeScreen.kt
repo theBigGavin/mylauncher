@@ -120,7 +120,15 @@ fun HomeScreen() {
         val landscape = maxWidth > maxHeight
         val topSpace = maxHeight * 0.09f
         val listSpace = maxHeight * 0.045f
-        Wallpaper(Modifier.fillMaxSize())
+
+        // 背景:内置几何壁纸(默认)或跟随系统壁纸(FLAG_SHOW_WALLPAPER + 暗纱)
+        val systemMode = data?.wallpaperMode == HomeStore.WALLPAPER_SYSTEM
+        ApplyShowWallpaperFlag(enabled = systemMode)
+        if (systemMode) {
+            SystemWallpaperScrim(Modifier.fillMaxSize())
+        } else {
+            Wallpaper(Modifier.fillMaxSize())
+        }
 
         if (data != null) {
             val iconSize = data.iconSizeDp.dp
@@ -264,9 +272,11 @@ fun HomeScreen() {
                     iconSize = data.iconSizeDp,
                     fontSize = data.fontSizeSp,
                     showIcons = data.showIcons,
+                    wallpaperMode = data.wallpaperMode,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
+                    onWallpaperMode = { scope.launch { store.setWallpaperMode(it) } },
                     onReset = {
                         showSettings = false
                         scope.launch {
