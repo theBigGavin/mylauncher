@@ -11,6 +11,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -345,6 +348,7 @@ fun AppList(
     onRename: (index: Int) -> Unit,
     onRemove: (index: Int) -> Unit,
     onReorder: (from: Int, to: Int) -> Unit,
+    onHoldChange: (Boolean) -> Unit = {},
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -367,10 +371,11 @@ fun AppList(
     val currentOnRename by rememberUpdatedState(onRename)
     val currentOnRemove by rememberUpdatedState(onRemove)
     val currentOnReorder by rememberUpdatedState(onReorder)
+    val currentOnHoldChange by rememberUpdatedState(onHoldChange)
 
-    // 普通 Column(不用 LazyColumn):左滑时行内容滑出列边界,
-    // LazyColumn 会裁剪边界外的内容("APP被列表框遮挡消失"的根因),Column 不会。
-    Column(modifier = modifier) {
+    // 普通 Column + verticalScroll(不用 LazyColumn):左滑时行内容滑出列边界,
+    // LazyColumn 会裁剪边界外的内容("APP被列表框遮挡消失"的根因);scrollable 不裁剪,可滚动。
+    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         items.forEachIndexed { index, item ->
             val revealed = index == revealedIndex
             val currentRevealed by rememberUpdatedState(revealed)
@@ -418,11 +423,12 @@ fun AppList(
                     }
             ) {
                 // 选中行背景:覆盖 滑出后的内容 + 操作按钮(横屏靠右;竖屏整行)
+                // requiredWidth:背景条要探出行/列表边界盖住滑出的内容,width 会被父约束钳制
                 if (landscape) {
                     Box(
                         Modifier
                             .align(Alignment.CenterEnd)
-                             .width(with(density) { (contentBounds.width + ACTION_WIDTH.toPx() + 12.dp.toPx()).toDp() })
+                            .requiredWidth(with(density) { (contentBounds.width + ACTION_WIDTH.toPx() + 12.dp.toPx()).toDp() })
                             .fillMaxHeight()
                             .background(Color.White.copy(alpha = rowBgAlpha))
                     )
@@ -475,8 +481,22 @@ fun AppList(
                         .pointerInput(item.app.component, index) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
+                                android.util.Log.d(
+                                    "MYL_HIT",
+                                    "down pos=${down.position} bounds=$contentBounds shift=${shift.value}"
+                                )
                                 // 触控区 = 图标+名称(行空白处不响应,避免误触)
-                                if (!contentBounds.contains(down.position)) return@awaitEachGesture
+                                // 左滑时内容整体左移:命中区跟随内容位移(两种坐标系都覆盖)
+                                val shifted = contentBounds.translate(-shift.value, 0f)
+                                if (!contentBounds.contains(down.position) &&
+                                    !shifted.contains(down.position)
+                                ) {
+                                    android.util.Log.d(
+                                        "MYL_HIT",
+                                        "reject idx=$index pos=${down.position} bounds=$contentBounds shift=${shift.value} shifted=$shifted"
+                                    )
+                                    return@awaitEachGesture
+                                }
                                 val press = PressInteraction.Press(down.position)
                                 scope.launch { interactionSource.emit(press) }
                                 when (val outcome = awaitPressOutcome(down)) {
@@ -491,40 +511,46 @@ fun AppList(
                                             setRevealed(-1)
                                         } else {
                                             // 长按后:按住并上下拖动 → 拖动排序;不动直接松手 → 替换应用
-                                            var reorder = false
-                                            val slop = viewConfiguration.touchSlop
-                                            while (true) {
-                                                val event = awaitPointerEvent(PointerEventPass.Main)
-                                                var up = false
-                                                for (change in event.changes) {
-                                                    if (change.id != down.id) continue
-                                                    if (change.changedToUp()) { up = true; break }
-                                                    // 长按后的移动全部归行处理,不落到壁纸手势(避免误开抽屉/设置)
-                                                    change.consume()
-                                                    if (!reorder && abs(change.position.y - down.position.y) > slop * 2f) {
-                                                        reorder = true
-                                                        scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }
-                                                        dragIndex = index
-                                                        dragTarget = index
+                                            // hold 标志立即通知上层:长按已被行接管,壁纸的"长按开设置"不再触发
+                                            currentOnHoldChange(true)
+                                            try {
+                                                var reorder = false
+                                                val slop = viewConfiguration.touchSlop
+                                                while (true) {
+                                                    val event = awaitPointerEvent(PointerEventPass.Main)
+                                                    var up = false
+                                                    for (change in event.changes) {
+                                                        if (change.id != down.id) continue
+                                                        if (change.changedToUp()) { up = true; break }
+                                                        // 长按后的移动全部归行处理,不落到壁纸手势(避免误开抽屉/设置)
+                                                        change.consume()
+                                                        if (!reorder && abs(change.position.y - down.position.y) > slop * 2f) {
+                                                            reorder = true
+                                                            scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }
+                                                            dragIndex = index
+                                                            dragTarget = index
+                                                        }
+                                                        if (reorder) {
+                                                            val dy = change.position.y - down.position.y
+                                                            scope.launch { lift.snapTo(dy) }
+                                                            dragTarget = (index + (dy / rowHeightPx).roundToInt())
+                                                                .coerceIn(0, currentItems.size - 1)
+                                                        }
                                                     }
-                                                    if (reorder) {
-                                                        val dy = change.position.y - down.position.y
-                                                        scope.launch { lift.snapTo(dy) }
-                                                        dragTarget = (index + (dy / rowHeightPx).roundToInt())
-                                                            .coerceIn(0, currentItems.size - 1)
-                                                    }
+                                                    if (up) break
                                                 }
-                                                if (up) break
-                                            }
-                                            if (reorder) {
-                                                val finalTarget = dragTarget
-                                                scope.launch { lift.animateTo(0f) }
-                                                dragIndex = -1
-                                                dragTarget = -1
-                                                if (finalTarget != index) currentOnReorder(index, finalTarget)
-                                            } else {
-                                                scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
-                                                currentOnReplace(index)
+                                                if (reorder) {
+                                                    val finalTarget = dragTarget
+                                                    scope.launch { lift.animateTo(0f) }
+                                                    dragIndex = -1
+                                                    dragTarget = -1
+                                                    if (finalTarget != index) currentOnReorder(index, finalTarget)
+                                                } else {
+                                                    scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
+                                                    currentOnReplace(index)
+                                                }
+                                            } finally {
+                                                currentOnHoldChange(false)
                                             }
                                         }
                                     }

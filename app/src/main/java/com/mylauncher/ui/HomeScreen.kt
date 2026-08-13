@@ -121,6 +121,8 @@ fun HomeScreen() {
     var drawerOpen by remember { mutableStateOf(false) }
     var renameIndex by remember { mutableIntStateOf(-1) }
     var showSettings by remember { mutableStateOf(false) }
+    // 行内长按接管中(拖动排序/替换):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
+    var rowHolding by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
@@ -135,7 +137,7 @@ fun HomeScreen() {
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = {
-                        if (picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
+                        if (!rowHolding && picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
                             showSettings = true
                         }
                     },
@@ -145,7 +147,7 @@ fun HomeScreen() {
                 var upward = false
                 detectVerticalDragGestures(
                     onDragEnd = {
-                        if (upward && picker == null && renameIndex < 0 && !showSettings && !drawerOpen) {
+                        if (upward && !rowHolding && picker == null && renameIndex < 0 && !showSettings && !drawerOpen) {
                             drawerOpen = true
                         }
                         upward = false
@@ -204,6 +206,7 @@ fun HomeScreen() {
                                 }
                             }
                         },
+                        onHoldChange = { rowHolding = it },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
@@ -233,7 +236,7 @@ fun HomeScreen() {
                         landscape = true,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(start = 80.dp, bottom = 80.dp),
+                            .padding(start = 180.dp, bottom = 80.dp),
                     )
                     AppList(
                         items = items,
@@ -267,6 +270,7 @@ fun HomeScreen() {
                                 }
                             }
                         },
+                        onHoldChange = { rowHolding = it },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
