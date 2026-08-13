@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -78,6 +80,7 @@ import androidx.compose.ui.zIndex
 import com.mylauncher.data.AppEntry
 import com.mylauncher.data.HomeStore
 import com.mylauncher.icons.rememberMonoIcon
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -238,7 +241,7 @@ fun AppRow(
                 shadow = textShadow,
             ),
             maxLines = 1,
-            overflow = if (landscape) TextOverflow.Clip else TextOverflow.Ellipsis,
+            overflow = TextOverflow.Ellipsis,
             modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
         )
     }
@@ -292,9 +295,12 @@ private fun AddRow(
                 fontSize = fontSize,
                 fontWeight = FontWeight.Light,
                 letterSpacing = 0.5.sp,
+                textAlign = if (landscape) TextAlign.End else TextAlign.Start,
                 shadow = textShadow,
             ),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
         )
     }
 }
@@ -375,7 +381,14 @@ fun AppList(
 
     // 普通 Column + verticalScroll(不用 LazyColumn):左滑时行内容滑出列边界,
     // LazyColumn 会裁剪边界外的内容("APP被列表框遮挡消失"的根因);scrollable 不裁剪,可滚动。
-    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
+    val scrollState = rememberScrollState()
+    // 列表视口(window 坐标),拖拽排序边缘自动滚动用
+    var listBounds by remember { mutableStateOf(Rect.Zero) }
+    Column(
+        modifier = modifier
+            .onGloballyPositioned { listBounds = it.boundsInWindow() }
+            .verticalScroll(scrollState),
+    ) {
         items.forEachIndexed { index, item ->
             val revealed = index == revealedIndex
             val currentRevealed by rememberUpdatedState(revealed)
@@ -481,20 +494,12 @@ fun AppList(
                         .pointerInput(item.app.component, index) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
-                                android.util.Log.d(
-                                    "MYL_HIT",
-                                    "down pos=${down.position} bounds=$contentBounds shift=${shift.value}"
-                                )
                                 // 触控区 = 图标+名称(行空白处不响应,避免误触)
                                 // 左滑时内容整体左移:命中区跟随内容位移(两种坐标系都覆盖)
                                 val shifted = contentBounds.translate(-shift.value, 0f)
                                 if (!contentBounds.contains(down.position) &&
                                     !shifted.contains(down.position)
                                 ) {
-                                    android.util.Log.d(
-                                        "MYL_HIT",
-                                        "reject idx=$index pos=${down.position} bounds=$contentBounds shift=${shift.value} shifted=$shifted"
-                                    )
                                     return@awaitEachGesture
                                 }
                                 val press = PressInteraction.Press(down.position)
@@ -515,7 +520,11 @@ fun AppList(
                                             currentOnHoldChange(true)
                                             try {
                                                 var reorder = false
+                                                var pointerYInList = Float.NaN
+                                                var autoScrollJob: Job? = null
                                                 val slop = viewConfiguration.touchSlop
+                                                val edgePx = 56.dp.toPx()
+                                                val maxStepPx = 12.dp.toPx()
                                                 while (true) {
                                                     val event = awaitPointerEvent(PointerEventPass.Main)
                                                     var up = false
@@ -529,9 +538,33 @@ fun AppList(
                                                             scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }
                                                             dragIndex = index
                                                             dragTarget = index
+                                                            autoScrollJob = scope.launch {
+                                                                while (true) {
+                                                                    val y = pointerYInList
+                                                                    val h = listBounds.height.toFloat()
+                                                                    if (!y.isNaN() && h > 0f) {
+                                                                        val delta = when {
+                                                                            y < edgePx -> -maxStepPx * (1f - y / edgePx)
+                                                                            y > h - edgePx -> maxStepPx * (1f - (h - y) / edgePx)
+                                                                            else -> 0f
+                                                                        }
+                                                                        if (delta != 0f) {
+                                                                            scrollState.dispatchRawDelta(delta)
+                                                                        }
+                                                                    }
+                                                                    withFrameNanos { }
+                                                                }
+                                                            }
                                                         }
                                                         if (reorder) {
-                                                            val dy = change.position.y - down.position.y
+                                                            // 注意:position 坐标系会被本行的 graphicsLayer(lift)
+                                                            // 与列表滚动一起平移 —— 必须加回 lift 才是真实跟手位移,
+                                                            // 否则 dy 变成差分(行只跟手一半,drop 目标位计算错误)
+                                                            val dy = change.position.y - down.position.y + lift.value
+                                                            // 手指相对列表视口顶部的 y(行视口偏移 + 行内真实偏移),
+                                                            // 供边缘自动滚动判定
+                                                            pointerYInList = (index * rowHeightPx - scrollState.value) +
+                                                                (change.position.y + lift.value)
                                                             scope.launch { lift.snapTo(dy) }
                                                             dragTarget = (index + (dy / rowHeightPx).roundToInt())
                                                                 .coerceIn(0, currentItems.size - 1)
@@ -539,6 +572,7 @@ fun AppList(
                                                     }
                                                     if (up) break
                                                 }
+                                                autoScrollJob?.cancel()
                                                 if (reorder) {
                                                     val finalTarget = dragTarget
                                                     scope.launch { lift.animateTo(0f) }
@@ -582,7 +616,7 @@ fun AppList(
                                 }
                             }
                         },
-                    contentAlignment = Alignment.CenterStart,
+                    contentAlignment = if (landscape) Alignment.CenterEnd else Alignment.CenterStart,
                 ) {
                     Row(
                         Modifier
@@ -609,7 +643,7 @@ fun AppList(
                                 shadow = textShadow,
                             ),
                             maxLines = 1,
-                            overflow = if (landscape) TextOverflow.Clip else TextOverflow.Ellipsis,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
                         )
                     }
@@ -627,7 +661,9 @@ fun AppList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(rowHeight)
-                    .padding(horizontal = LIST_H_MARGIN),
+                    // 横屏与普通行一致用 12dp;竖屏用统一边距 LIST_H_MARGIN
+                    // (横屏曾误用 80dp 导致"添加应用"名称被裁掉)
+                    .padding(horizontal = if (landscape) 12.dp else LIST_H_MARGIN),
             )
         }
     }

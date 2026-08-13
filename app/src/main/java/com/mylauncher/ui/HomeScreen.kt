@@ -227,9 +227,12 @@ fun HomeScreen() {
             } else {
                 // 横屏:时钟左下,列表靠右单列(图标一列垂线、名称右对齐)
                 // 列宽固定 = 内容+边距;左滑只让选中行内容左移,列不伸缩
+                // + ACTION_WIDTH:左滑露出操作按钮时内容整体左移 176dp,
+                // 列表(滚动容器)会裁剪边界外内容,故裁切区向左扩出一个按钮区宽
                 val listWidth = with(LocalDensity.current) {
                     (iconSize.toPx() + (fontSize * 5.5f).toPx() + 18.dp.toPx() +
-                        20.dp.toPx() + 180.dp.toPx() + 12.dp.toPx() + 12.dp.toPx()).toDp()
+                        20.dp.toPx() + 180.dp.toPx() + 12.dp.toPx() + 12.dp.toPx() +
+                        ACTION_WIDTH.toPx()).toDp()
                 }
                 Box(Modifier.fillMaxSize()) {
                     ClockWidget(

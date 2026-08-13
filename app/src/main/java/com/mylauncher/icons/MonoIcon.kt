@@ -132,10 +132,11 @@ object MonoIcons {
 fun rememberMonoIcon(entry: AppEntry, size: Dp): ImageBitmap? {
     val context = LocalContext.current
     val sizePx = with(LocalDensity.current) { size.roundToPx() }.coerceAtLeast(24)
-    return produceState<ImageBitmap?>(
-        initialValue = MonoIcons.loadCached(context, entry, sizePx)?.asImageBitmap(),
-        entry.component, sizePx,
-    ) {
+    // 注意:produceState 内部的 value 是无 key 的 remember,列表按位置复用组合时
+    // (如拖拽排序后)旧值会残留 —— 不能在 producer 里用 value==null 短路,
+    // 每次 keys 变化都必须重新按当前 entry 取图(内存/磁盘缓存保证足够快)。
+    return produceState<ImageBitmap?>(null, entry.component, sizePx) {
+        value = MonoIcons.loadCached(context, entry, sizePx)?.asImageBitmap()
         if (value == null) {
             value = withContext(Dispatchers.IO) {
                 MonoIcons.load(context, entry, sizePx).asImageBitmap()
