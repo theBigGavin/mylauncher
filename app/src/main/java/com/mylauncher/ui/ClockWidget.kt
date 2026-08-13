@@ -37,11 +37,17 @@ fun ClockWidget(landscape: Boolean, modifier: Modifier = Modifier) {
     val date = "星期$week · ${now.get(Calendar.MONTH) + 1}月${now.get(Calendar.DAY_OF_MONTH)}日"
 
     val config = LocalConfiguration.current
-    // 对应 CSS:竖屏 min(26vw, 120px);横屏 min(15vh, 84px)
+    // 竖屏对应 CSS min(26vw, 120px);横屏自适应,至少占屏高 1/5
     val timeSize = if (landscape) {
-        minOf(84f, config.screenHeightDp * 0.15f)
+        maxOf(84f, config.screenHeightDp * 0.20f)
     } else {
         minOf(120f, config.screenWidthDp * 0.26f)
+    }
+    // 日期约为时间字号 1/3,宽度与时间大致对齐;加大字间距配 Zune 风格
+    val dateSize = if (landscape) {
+        (timeSize * 0.32f).coerceIn(22f, 48f)
+    } else {
+        (timeSize * 0.32f).coerceIn(26f, 44f)
     }
 
     Column(
@@ -63,8 +69,10 @@ fun ClockWidget(landscape: Boolean, modifier: Modifier = Modifier) {
             text = date,
             style = TextStyle(
                 color = Color.White.copy(alpha = 0.7f),
-                fontSize = if (landscape) 15.sp else 18.sp,
+                fontSize = dateSize.sp,
                 fontWeight = FontWeight.Light,
+                letterSpacing = if (landscape) 3.sp else 4.sp,
+                shadow = textShadow,
             ),
         )
     }

@@ -4,8 +4,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -15,8 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -30,29 +34,31 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.mylauncher.badges.BadgeStore
+import com.mylauncher.data.AppEntry
 import com.mylauncher.data.AppRepository
+import com.mylauncher.data.DefaultApps
 import com.mylauncher.data.HomeStore
 import com.mylauncher.data.StoredEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 private sealed interface PickerRequest {
     data class Replace(val index: Int) : PickerRequest
     data object Add : PickerRequest
 }
 
-/** 主屏总装配:方向感知布局 + 全部浮层(菜单 / 改名 / 选择器 / 设置)。 */
+/** 主屏总装配:方向感知布局 + 全部浮层(改名 / 选择器 / 设置 / 抽屉)。 */
 @Composable
 fun HomeScreen() {
     val context = LocalContext.current
@@ -62,6 +68,7 @@ fun HomeScreen() {
 
     val allApps by repo.apps.collectAsState()
     val homeData by store.data.collectAsState(initial = null)
+    val badgeCounts by BadgeStore.counts.collectAsState()
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { repo.refresh() }
@@ -86,10 +93,10 @@ fun HomeScreen() {
     val apps = allApps
     val data = homeData
 
-    // 首次启动:默认填充前 12 个可启动应用(按名称排序)
+    // 首次启动:默认加载常用应用
     LaunchedEffect(apps, data?.initialized) {
         if (apps != null && data != null && !data.initialized && apps.isNotEmpty()) {
-            store.setEntries(apps.take(12).map { StoredEntry(it.component, null) })
+            store.setEntries(DefaultApps.pick(apps).map { StoredEntry(it.component, null) })
         }
     }
 
@@ -111,28 +118,53 @@ fun HomeScreen() {
     }
 
     var picker by remember { mutableStateOf<PickerRequest?>(null) }
-    var menuIndex by remember { mutableIntStateOf(-1) }
-    var menuPos by remember { mutableStateOf(IntOffset.Zero) }
+    var drawerOpen by remember { mutableStateOf(false) }
     var renameIndex by remember { mutableIntStateOf(-1) }
     var showSettings by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
-        val topSpace = maxHeight * 0.09f
-        val listSpace = maxHeight * 0.045f
-
+        val topSpace = maxHeight * 0.20f
+        val listSpace = maxHeight * 0.05f
         // 背景:内置几何壁纸(默认)或跟随系统壁纸(FLAG_SHOW_WALLPAPER + 暗纱)
         val systemMode = data?.wallpaperMode == HomeStore.WALLPAPER_SYSTEM
         ApplyShowWallpaperFlag(enabled = systemMode)
+        // 手势挂在背景层上:长按空白开设置(行内长按由行自己处理,行更深先收到事件)、上滑开抽屉
+        val bgModifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        if (picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
+                            showSettings = true
+                        }
+                    },
+                )
+            }
+            .pointerInput(Unit) {
+                var upward = false
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (upward && picker == null && renameIndex < 0 && !showSettings && !drawerOpen) {
+                            drawerOpen = true
+                        }
+                        upward = false
+                    },
+                    onDragCancel = { upward = false },
+                ) { _, dragAmount ->
+                    if (dragAmount < 0) upward = true
+                }
+            }
         if (systemMode) {
-            SystemWallpaperScrim(Modifier.fillMaxSize())
+            SystemWallpaperScrim(bgModifier)
         } else {
-            Wallpaper(Modifier.fillMaxSize())
+            Wallpaper(bgModifier)
         }
 
         if (data != null) {
             val iconSize = data.iconSizeDp.dp
             val fontSize = data.fontSizeSp.sp
+            val rowSpacing = data.rowSpacingDp.dp
 
             if (!landscape) {
                 // 竖屏:居中超大时钟 + 竖行列表 + 底部计数
@@ -144,17 +176,34 @@ fun HomeScreen() {
                         items = items,
                         iconSize = iconSize,
                         fontSize = fontSize,
+                        rowSpacing = rowSpacing,
                         showIcons = data.showIcons,
+                        showBadges = data.showBadges,
+                        badgeCounts = badgeCounts,
                         landscape = false,
-                        onLaunch = { launch(context, repo, it) },
-                        onLongPressMenu = { idx, pos ->
-                            menuIndex = idx
-                            menuPos = IntOffset(pos.x.roundToInt(), pos.y.roundToInt())
-                        },
-                        onMove = { from, to ->
-                            scope.launch { store.setEntries(moveEntry(data.entries, from, to)) }
+                        onLaunch = { launch(context, repo, it.app) },
+                        onReplace = { picker = PickerRequest.Replace(it) },
+                        onRename = { renameIndex = it },
+                        onRemove = { i ->
+                            scope.launch {
+                                val list = data.entries.toMutableList()
+                                if (i < list.size) {
+                                    list.removeAt(i)
+                                    store.setEntries(list)
+                                }
+                            }
                         },
                         onAdd = { picker = PickerRequest.Add },
+                        onReorder = { from, to ->
+                            scope.launch {
+                                val list = data.entries.toMutableList()
+                                if (from in list.indices && to in list.indices) {
+                                    val e = list.removeAt(from)
+                                    list.add(to, e)
+                                    store.setEntries(list)
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
@@ -163,7 +212,7 @@ fun HomeScreen() {
                         text = "— ${items.size} / ${HomeStore.MAX_APPS} —",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp, bottom = 16.dp),
+                            .padding(top = 16.dp, bottom = 48.dp),
                         style = TextStyle(
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 12.sp,
@@ -174,81 +223,60 @@ fun HomeScreen() {
                 }
             } else {
                 // 横屏:时钟左下,列表靠右单列(图标一列垂线、名称右对齐)
+                // 列宽固定 = 内容+边距;左滑只让选中行内容左移,列不伸缩
+                val listWidth = with(LocalDensity.current) {
+                    (iconSize.toPx() + (fontSize * 5.5f).toPx() + 18.dp.toPx() +
+                        20.dp.toPx() + 180.dp.toPx() + 12.dp.toPx() + 12.dp.toPx()).toDp()
+                }
                 Box(Modifier.fillMaxSize()) {
                     ClockWidget(
                         landscape = true,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(start = 30.dp, bottom = 22.dp),
+                            .padding(start = 80.dp, bottom = 80.dp),
                     )
                     AppList(
                         items = items,
                         iconSize = iconSize,
                         fontSize = fontSize,
+                        rowSpacing = rowSpacing,
                         showIcons = data.showIcons,
+                        showBadges = data.showBadges,
+                        badgeCounts = badgeCounts,
                         landscape = true,
-                        onLaunch = { launch(context, repo, it) },
-                        onLongPressMenu = { idx, pos ->
-                            menuIndex = idx
-                            menuPos = IntOffset(pos.x.roundToInt(), pos.y.roundToInt())
-                        },
-                        onMove = { from, to ->
-                            scope.launch { store.setEntries(moveEntry(data.entries, from, to)) }
+                        onLaunch = { launch(context, repo, it.app) },
+                        onReplace = { picker = PickerRequest.Replace(it) },
+                        onRename = { renameIndex = it },
+                        onRemove = { i ->
+                            scope.launch {
+                                val list = data.entries.toMutableList()
+                                if (i < list.size) {
+                                    list.removeAt(i)
+                                    store.setEntries(list)
+                                }
+                            }
                         },
                         onAdd = { picker = PickerRequest.Add },
+                        onReorder = { from, to ->
+                            scope.launch {
+                                val list = data.entries.toMutableList()
+                                if (from in list.indices && to in list.indices) {
+                                    val e = list.removeAt(from)
+                                    list.add(to, e)
+                                    store.setEntries(list)
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
-                            .fillMaxWidth(0.52f)
-                            .padding(horizontal = 30.dp, vertical = 18.dp),
+                            .width(listWidth)
+                            .padding(start = 20.dp, end = 180.dp, top = 48.dp, bottom = 48.dp)
                     )
                 }
             }
 
-            // 右下角设置齿轮
-            Box(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(14.dp)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .clickable { showSettings = !showSettings },
-                contentAlignment = Alignment.Center,
-            ) {
-                BasicText(
-                    text = "⚙",
-                    style = TextStyle(color = Color.White, fontSize = 19.sp),
-                )
-            }
-
             // ---- 浮层 ----
-            if (menuIndex >= 0 && menuIndex < items.size) {
-                LongPressMenu(
-                    positionInWindow = menuPos,
-                    onReplace = {
-                        picker = PickerRequest.Replace(menuIndex)
-                        menuIndex = -1
-                    },
-                    onRename = {
-                        renameIndex = menuIndex
-                        menuIndex = -1
-                    },
-                    onRemove = {
-                        val i = menuIndex
-                        menuIndex = -1
-                        scope.launch {
-                            val list = data.entries.toMutableList()
-                            if (i < list.size) {
-                                list.removeAt(i)
-                                store.setEntries(list)
-                            }
-                        }
-                    },
-                    onDismiss = { menuIndex = -1 },
-                )
-            }
-
             if (renameIndex >= 0 && renameIndex < items.size) {
                 RenameDialog(
                     initial = items[renameIndex].displayName,
@@ -268,20 +296,25 @@ fun HomeScreen() {
             }
 
             if (showSettings) {
-                SettingsPanel(
+                SettingsScreen(
                     iconSize = data.iconSizeDp,
                     fontSize = data.fontSizeSp,
+                    rowSpacing = data.rowSpacingDp,
                     showIcons = data.showIcons,
+                    showBadges = data.showBadges,
                     wallpaperMode = data.wallpaperMode,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
+                    onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
+                    onShowBadges = { scope.launch { store.setShowBadges(it) } },
                     onWallpaperMode = { scope.launch { store.setWallpaperMode(it) } },
                     onReset = {
                         showSettings = false
                         scope.launch {
                             store.resetAll(
-                                (apps ?: emptyList()).take(12).map { StoredEntry(it.component, null) }
+                                DefaultApps.pick(apps ?: emptyList())
+                                    .map { StoredEntry(it.component, null) }
                             )
                         }
                     },
@@ -329,15 +362,35 @@ fun HomeScreen() {
             onDismiss = { picker = null },
         )
     }
+
+    // 应用抽屉(空白处上滑拉出)
+    AnimatedVisibility(
+        visible = drawerOpen && apps != null && data != null,
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+    ) {
+        if (apps != null && data != null) {
+            AppDrawer(
+                apps = apps,
+                iconSize = data.iconSizeDp.dp,
+                fontSize = data.fontSizeSp.sp,
+                showIcons = data.showIcons,
+                onAddToHome = { entry ->
+                    scope.launch {
+                        val cur = data.entries
+                        if (cur.none { it.component == entry.component } &&
+                            cur.size < HomeStore.MAX_APPS
+                        ) {
+                            store.setEntries(cur + StoredEntry(entry.component, null))
+                        }
+                    }
+                },
+                onDismiss = { drawerOpen = false },
+            )
+        }
+    }
 }
 
-private fun moveEntry(entries: List<StoredEntry>, from: Int, to: Int): List<StoredEntry> {
-    val list = entries.toMutableList()
-    val e = list.removeAt(from)
-    list.add(to.coerceIn(0, list.size), e)
-    return list
-}
-
-private fun launch(context: Context, repo: AppRepository, item: HomeItem) {
-    runCatching { context.startActivity(repo.launchIntent(item.app)) }
+private fun launch(context: Context, repo: AppRepository, entry: AppEntry) {
+    runCatching { context.startActivity(repo.launchIntent(entry)) }
 }

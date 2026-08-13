@@ -83,7 +83,11 @@ object MonoIcons {
         return bmp
     }
 
-    /** 亮度 -> alpha,颜色纯白;lum^2.1 * 1.2 曲线压低彩色底,只保留亮色 glyph。 */
+    /**
+     * 亮度 -> 形状取舍,输出**不透明**纯白:
+     * lum^2.1 * 1.2 曲线压低彩色底,亮部输出纯白、暗部透明,中间留平滑过渡带抗锯齿。
+     * 注意:与 render_mockup.py 的半透明版 to_mono_white 已分叉(实机不透明更耐壁纸亮线),后续需同步 mockup。
+     */
     private fun toMonoWhite(src: Bitmap): Bitmap {
         val w = src.width
         val h = src.height
@@ -97,9 +101,13 @@ object MonoIcons {
             val b = c and 0xff
             // PIL convert("L") 的 ITU-R 601-2 权重
             val lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-            val curved = min(1.0, lum.pow(2.1) * 1.2)
-            val alpha = (curved * 255).toInt() * a / 255
-            pixels[i] = alpha shl 24 or 0x00FFFFFF
+            val curved = min(1.0, lum.pow(2.1) * 1.2) * (a / 255.0)
+            pixels[i] = when {
+                curved >= 0.45 -> 0xFFFFFFFF.toInt() // 亮部 glyph:不透明纯白
+                curved >= 0.30 -> // 过渡带:平滑抗锯齿
+                    (((curved - 0.30) / 0.15 * 255).toInt() shl 24) or 0x00FFFFFF
+                else -> 0x00000000 // 彩色底/暗部:透明
+            }
         }
         return Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
     }

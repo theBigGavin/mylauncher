@@ -20,6 +20,8 @@ data class HomeData(
     val iconSizeDp: Int,
     val fontSizeSp: Int,
     val showIcons: Boolean,
+    val rowSpacingDp: Int,
+    val showBadges: Boolean,
     val wallpaperMode: String,
 )
 
@@ -29,6 +31,7 @@ class HomeStore(private val context: Context) {
         const val MAX_APPS = 20
         const val DEFAULT_ICON_DP = 38
         const val DEFAULT_FONT_SP = 26
+        const val DEFAULT_ROW_SPACING_DP = 0
 
         const val WALLPAPER_BUILTIN = "builtin"
         const val WALLPAPER_SYSTEM = "system"
@@ -38,6 +41,8 @@ class HomeStore(private val context: Context) {
         private val KEY_ICON = intPreferencesKey("icon_size_dp")
         private val KEY_FONT = intPreferencesKey("font_size_sp")
         private val KEY_SHOW_ICONS = booleanPreferencesKey("show_icons")
+        private val KEY_ROW_SPACING = intPreferencesKey("row_spacing_dp")
+        private val KEY_SHOW_BADGES = booleanPreferencesKey("show_badges")
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
     }
 
@@ -48,6 +53,8 @@ class HomeStore(private val context: Context) {
             iconSizeDp = p[KEY_ICON] ?: DEFAULT_ICON_DP,
             fontSizeSp = p[KEY_FONT] ?: DEFAULT_FONT_SP,
             showIcons = p[KEY_SHOW_ICONS] ?: true,
+            rowSpacingDp = p[KEY_ROW_SPACING] ?: DEFAULT_ROW_SPACING_DP,
+            showBadges = p[KEY_SHOW_BADGES] ?: true,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
         )
     }
@@ -71,6 +78,14 @@ class HomeStore(private val context: Context) {
         context.homeDataStore.edit { it[KEY_SHOW_ICONS] = value }
     }
 
+    suspend fun setRowSpacing(value: Int) {
+        context.homeDataStore.edit { it[KEY_ROW_SPACING] = value.coerceIn(0, 48) }
+    }
+
+    suspend fun setShowBadges(value: Boolean) {
+        context.homeDataStore.edit { it[KEY_SHOW_BADGES] = value }
+    }
+
     suspend fun setWallpaperMode(value: String) {
         context.homeDataStore.edit {
             it[KEY_WALLPAPER] = if (value == WALLPAPER_SYSTEM) WALLPAPER_SYSTEM else WALLPAPER_BUILTIN
@@ -84,6 +99,8 @@ class HomeStore(private val context: Context) {
             it[KEY_ICON] = DEFAULT_ICON_DP
             it[KEY_FONT] = DEFAULT_FONT_SP
             it[KEY_SHOW_ICONS] = true
+            it[KEY_ROW_SPACING] = DEFAULT_ROW_SPACING_DP
+            it[KEY_SHOW_BADGES] = true
             it[KEY_WALLPAPER] = WALLPAPER_BUILTIN
         }
     }
