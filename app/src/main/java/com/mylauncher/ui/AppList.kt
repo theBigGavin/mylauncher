@@ -82,6 +82,7 @@ import com.mylauncher.icons.rememberMonoIcon
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** 所有列表界面的左右边距:桌面 / 抽屉 / 选择器 / 设置页保持一致。 */
 val LIST_H_MARGIN = 80.dp
@@ -351,12 +352,14 @@ fun AppList(
     onRename: (index: Int) -> Unit,
     onRemove: (index: Int) -> Unit,
     onReorder: (from: Int, to: Int) -> Unit = { _, _ -> },
+    onHoldChange: (Boolean) -> Unit = {},
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
     val rowHeight = appRowHeight(iconSize, fontSize, rowSpacing)
     val actionWidthPx = with(density) { actionWidth().toPx() }
+    val rowHeightPx = with(density) { rowHeight.toPx() }
 
     // 单行展开状态:只有该行左滑,其余行与列都保持原位
     var revealedIndex by remember { mutableIntStateOf(-1) }
@@ -369,6 +372,7 @@ fun AppList(
     val currentOnRename by rememberUpdatedState(onRename)
     val currentOnRemove by rememberUpdatedState(onRemove)
     val currentOnReorder by rememberUpdatedState(onReorder)
+    val currentOnHoldChange by rememberUpdatedState(onHoldChange)
 
     // LazyColumn:虚拟化 + 原生滚动;列宽已含 ACTION_WIDTH(左滑露出区),
     // 滑出的内容仍在视口内,不会被裁剪
@@ -418,10 +422,13 @@ fun AppList(
             // 内容左移量(px):左滑拖拽跟手,松手按阈值落定;只有本行动,其余行原位
             val shift = remember { Animatable(0f) }
             val buttonsAlpha = (shift.value / actionWidthPx).coerceIn(0f, 1f)
-            // 选中行背景:让用户看出当前行处于"管理"状态
+            // 拖动排序时被拖行的上浮量(px);拖动中其他行保持原位,松手后才插位
+            val lift = remember { Animatable(0f) }
+            // 选中行背景:让用户看出当前行处于"管理"/"拖动"状态
             val rowBgAlpha by animateFloatAsState(
                 targetValue = if (revealed) 0.12f
                 else if (buttonsAlpha > 0f) 0.08f
+                else if (lift.value != 0f) 0.10f
                 else 0f,
                 label = "revealBg",
             )
@@ -439,6 +446,12 @@ fun AppList(
                     .animateItem()
                     .fillMaxWidth()
                     .height(rowHeight)
+                    .zIndex(if (lift.value != 0f) 1f else 0f)
+                    .graphicsLayer {
+                        translationY = lift.value
+                        scaleX = if (lift.value != 0f) 1.02f else 1f
+                        scaleY = if (lift.value != 0f) 1.02f else 1f
+                    }
             ) {
                 // 选中行背景:覆盖 滑出后的内容 + 操作按钮(横屏靠右;竖屏整行)
                 // requiredWidth:背景条要探出行/列表边界盖住滑出的内容,width 会被父约束钳制
@@ -520,12 +533,62 @@ fun AppList(
                                         else currentOnLaunch(item)
                                     }
                                     PressOutcome.LongPress -> {
-                                        scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
                                         if (currentRevealed) {
+                                            scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
                                             setRevealed(-1)
                                         } else {
-                                            // 长按超时立即打开替换选择页,不等手指抬起
-                                            currentOnReplace(index)
+                                            // 长按超时后 300ms 宽限:手指移动 → 拖动排序;
+                                            // 不动 → 立即进选择页(不等松手,选择页不会误读当前手势)
+                                            currentOnHoldChange(true)
+                                            try {
+                                                var reorder = false
+                                                var finalTarget = index
+                                                val slop = viewConfiguration.touchSlop
+                                                // 宽限期内监听:移动超过阈值进入排序;松手/超时则进选择页
+                                                val movedOrUp = withTimeoutOrNull(300) {
+                                                    while (true) {
+                                                        val event = awaitPointerEvent(PointerEventPass.Main)
+                                                        var up = false
+                                                        for (change in event.changes) {
+                                                            if (change.id != down.id) continue
+                                                            if (change.changedToUp()) { up = true; break }
+                                                            change.consume()
+                                                            if (abs(change.position.y - down.position.y) > slop * 2f) {
+                                                                reorder = true
+                                                                return@withTimeoutOrNull true
+                                                            }
+                                                        }
+                                                        if (up) break
+                                                    }
+                                                    false
+                                                }
+                                                if (reorder) {
+                                                    // 拖动排序:被拖行跟手,松手按落位重排
+                                                    scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }
+                                                    while (true) {
+                                                        val event = awaitPointerEvent(PointerEventPass.Main)
+                                                        var up = false
+                                                        for (change in event.changes) {
+                                                            if (change.id != down.id) continue
+                                                            if (change.changedToUp()) { up = true; break }
+                                                            change.consume()
+                                                            val dy = change.position.y - down.position.y
+                                                            scope.launch { lift.snapTo(dy) }
+                                                            finalTarget = (index + (dy / rowHeightPx).roundToInt())
+                                                                .coerceIn(0, currentItems.size - 1)
+                                                        }
+                                                        if (up) break
+                                                    }
+                                                    scope.launch { lift.animateTo(0f) }
+                                                    if (finalTarget != index) currentOnReorder(index, finalTarget)
+                                                } else {
+                                                    // 未拖动(宽限超时或松手):立即进选择页
+                                                    scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
+                                                    currentOnReplace(index)
+                                                }
+                                            } finally {
+                                                currentOnHoldChange(false)
+                                            }
                                         }
                                     }
                                     PressOutcome.SwipeLeft -> {

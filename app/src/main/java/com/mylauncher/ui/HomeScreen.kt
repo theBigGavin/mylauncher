@@ -158,6 +158,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var drawerOpen by remember { mutableStateOf(false) }
     var renameIndex by remember { mutableIntStateOf(-1) }
     var showSettings by remember { mutableStateOf(false) }
+    // 行内长按接管中(拖动排序):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
+    var rowHolding by remember { mutableStateOf(false) }
 
     // 更换壁纸:交给系统壁纸管理器(选择 + 裁切 + 横竖屏/内屏适配全由系统处理),
     // 桌面用 FLAG_SHOW_WALLPAPER 跟随系统壁纸
@@ -189,7 +191,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = {
-                        if (picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
+                        if (!rowHolding && picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
                             showSettings = true
                         }
                     },
@@ -205,7 +207,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onDragStart = { startY = it.y },
                     onDragEnd = {
                         if (upward && startY > triggerTop &&
-                            picker == null && renameIndex < 0 && !showSettings && !drawerOpen
+                            !rowHolding && picker == null && renameIndex < 0 && !showSettings && !drawerOpen
                         ) {
                             drawerOpen = true
                         }
@@ -284,6 +286,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                             }
                         },
                         onAdd = { picker = PickerRequest.Add },
+                        onHoldChange = { rowHolding = it },
                         onReorder = { from, to ->
                             scope.launch {
                                 val list = data.entries.toMutableList()
@@ -350,6 +353,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                             }
                         },
                         onAdd = { picker = PickerRequest.Add },
+                        onHoldChange = { rowHolding = it },
                         onReorder = { from, to ->
                             scope.launch {
                                 val list = data.entries.toMutableList()

@@ -188,7 +188,7 @@ fun SettingsScreen(
                 SettingRow("列表高度(竖屏)") {
                     MiniSlider(
                         value = listHeightPercent.toFloat(),
-                        range = 25f..100f,
+                        range = 25f..55f,
                         modifier = Modifier.width(150.dp),
                         onChange = { onListHeight(HomeStore.WALLPAPER_FORM_PORTRAIT, it.roundToInt()) },
                     )

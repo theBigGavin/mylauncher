@@ -1,6 +1,7 @@
 package com.mylauncher.ui
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,9 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -30,7 +33,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 @Composable
 internal fun MiniSlider(
@@ -41,6 +49,9 @@ internal fun MiniSlider(
 ) {
     val currentOnChange by rememberUpdatedState(onChange)
     var widthPx by remember { mutableFloatStateOf(1f) }
+    var dragging by remember { mutableStateOf(false) }
+    // 拖动中旋钮放大(graphicsLayer 缩放,不占布局、不影响行高、不闪烁)
+    val knobScale by animateFloatAsState(if (dragging) 1.7f else 1f, label = "sliderKnob")
 
     fun valueFor(x: Float): Float =
         range.start + (x / widthPx).coerceIn(0f, 1f) * (range.endInclusive - range.start)
@@ -53,23 +64,51 @@ internal fun MiniSlider(
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     down.consume()
+                    dragging = true
                     currentOnChange(valueFor(down.position.x))
                     drag(down.id) { change ->
                         currentOnChange(valueFor(change.position.x))
                         change.consume()
                     }
+                    dragging = false
                 }
             },
         contentAlignment = Alignment.CenterStart,
     ) {
+        val frac = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
         Canvas(Modifier.fillMaxWidth().height(24.dp)) {
             val y = size.height / 2f
-            val frac = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
             val track = Color.White.copy(alpha = 0.20f)
             val active = Color.White
             drawLine(track, Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
             drawLine(active, Offset(0f, y), Offset(size.width * frac, y), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
-            drawCircle(active, radius = 6.dp.toPx(), center = Offset(size.width * frac, y))
+            drawCircle(active, radius = 6.dp.toPx() * knobScale, center = Offset(size.width * frac, y))
+        }
+        // 拖动中的气泡数值(悬浮在旋钮上方,不占布局)
+        if (dragging) {
+            val label = value.roundToInt().toString()
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .offset(
+                        x = with(LocalDensity.current) { (widthPx * frac - 18.dp.toPx()).toDp() },
+                        y = (-30).dp,
+                    )
+                    .width(36.dp)
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.White),
+                contentAlignment = Alignment.Center,
+            ) {
+                BasicText(
+                    text = label,
+                    style = TextStyle(
+                        color = Color(0xFF1E1E22),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                )
+            }
         }
     }
 }
