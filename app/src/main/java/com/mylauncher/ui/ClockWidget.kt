@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Calendar
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 
 /** 一个功德气泡:从小放大扩散、白→透明消失,位置/字号随机(不影响布局)。 */
@@ -119,25 +121,23 @@ fun ClockWidget(
                     bubble = bubble,
                     clockFontSizePx = clockPx,
                     areaW = maxWidth,
-                    areaH = maxHeight,
-                    // 从时钟位置向屏幕顶端上升
-                    riseFromWindowY = windowY + with(LocalDensity.current) { maxHeight.toPx() } / 2f,
+                    // 从时钟文字顶部开始冒泡,向屏幕顶端扩散
+                    clockTopWindowY = windowY,
                     onDone = { onMeritBubbleDone(bubble.id) },
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             }
         }
     }
 }
 
-/** 单个功德气泡:出现在时钟中间 1/3,向屏幕顶端上升 + 放大 + 白→透明消失。 */
+/** 单个功德气泡:从时钟文字顶部冒泡,沿选定方向(向上斜线)扩散 + 放大 + 白→透明消失。 */
 @Composable
 private fun MeritBubble(
     bubble: MeritBubbleData,
     clockFontSizePx: Float,
     areaW: Dp,
-    areaH: Dp,
-    riseFromWindowY: Float,
+    clockTopWindowY: Float,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -145,11 +145,15 @@ private fun MeritBubble(
     // 最终字号 = 时钟字号的 70%~90% 随机;初始字号更小(随机)
     val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
     val startSize = endSize * (0.30f + Random.nextFloat() * 0.30f)
-    // 出现位置:时钟中间 1/3 范围内随机(相对时钟中心)
-    val offXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
-    val offYPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaH.toPx() } / 6f
-    // 上升:从当前位置一路升到屏幕顶端(translationY 不占布局)
-    val startWindowY = riseFromWindowY + offYPx
+    // 起始水平位置:时钟中间 1/3 范围内随机(垂直在时钟文字顶部)
+    val startXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
+    // 扩散方向:向上偏左/偏右的斜线(±40° 随机,选定后不变,不左右乱晃)
+    val angleDeg = (Random.nextFloat() * 2f - 1f) * 40f
+    val rad = Math.toRadians(angleDeg.toDouble())
+    val dirX = sin(rad).toFloat()
+    val dirY = -cos(rad).toFloat()
+    // 扩散距离:时钟顶部到屏幕顶端的距离(随机比例)
+    val dist = clockTopWindowY * (0.8f + Random.nextFloat() * 0.4f)
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
@@ -159,9 +163,11 @@ private fun MeritBubble(
     val alpha = 1f - progress.value
     Box(
         modifier
-            .offset(x = with(density) { offXPx.toDp() })
+            .offset(x = with(density) { startXPx.toDp() })
             .graphicsLayer {
-                translationY = -startWindowY * progress.value
+                // 沿选定方向斜线移动(直线上移,无左右晃动)
+                translationX = dirX * dist * progress.value
+                translationY = dirY * dist * progress.value
                 scaleX = scale
                 scaleY = scale
                 this.alpha = alpha
