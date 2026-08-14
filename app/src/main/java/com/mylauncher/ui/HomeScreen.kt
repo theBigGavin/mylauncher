@@ -172,6 +172,15 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var meritBubbles by remember { mutableStateOf(listOf<MeritBubbleData>()) }
     var meritSeq by remember { mutableIntStateOf(0) }
     val currentData by rememberUpdatedState(data)
+    // 应用自身边缘检测:滑动一开始移动即敲木鱼(跟手,不等返回手势完成)
+    val soundEnabled by rememberUpdatedState(
+        data?.easterEggEnabled == true && data?.meritSoundEnabled == true
+    )
+    fun knockNow() {
+        if (soundEnabled && picker == null && !drawerOpen && !showSettings) {
+            KnockSound.play()
+        }
+    }
     // 返回手势触发功德彩蛋:声音 + 功德+1 + 冒泡
     LaunchedEffect(Unit) {
         LauncherEvents.backGesture.collect {
