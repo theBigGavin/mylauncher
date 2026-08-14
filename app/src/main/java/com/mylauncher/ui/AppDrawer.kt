@@ -492,13 +492,14 @@ internal fun AppListOverlay(
                             }
                             // 右侧操作按钮:必须画在内容层之上(后绘 = 命中优先),
                             // 否则内容层 fillMaxSize 挡住按钮,点按永远落不到按钮上(修过的坑);
-                            // 深色衬底保证按钮文字压在长名称上仍然可读
+                            // 不铺深色衬底:background 与 graphicsLayer 同链时 alpha 不生效(实测衬底常驻),
+                            // 文字可读性靠 textShadow 保证
                             Row(
                                 Modifier
                                     .align(Alignment.CenterEnd)
                                     .height(rowHeight)
-                                    .padding(end = LIST_H_MARGIN)
-                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    // 右侧留白比列表边距更宽,按钮不贴屏幕右缘(用户反馈 信息 太靠右)
+                                    .padding(end = LIST_H_MARGIN + 24.dp)
                                     .graphicsLayer {
                                         alpha = buttonsAlpha
                                         translationX = (1f - buttonsAlpha) * slidePx
