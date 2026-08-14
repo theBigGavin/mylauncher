@@ -15,6 +15,7 @@ object KnockSound {
     private var soundId = 0
     private var loaded = false
     private var pendingPlay = false
+    private var lastPlayMs = 0L
 
     /** 应用启动时初始化一次(主线程调用,异步加载)。 */
     fun init(context: Context) {
@@ -39,8 +40,12 @@ object KnockSound {
         }
     }
 
-    /** 敲一次木鱼(非阻塞;未加载完时挂起,加载完成后补敲)。 */
+    /** 敲一次木鱼(非阻塞;未加载完时挂起,加载完成后补敲)。
+     *  同一手势可能经两条路径触发(应用侧边缘检测 + 返回完成回调),500ms 内去重只响一次。 */
     fun play() {
+        val now = System.currentTimeMillis()
+        if (now - lastPlayMs < 500) return
+        lastPlayMs = now
         val pool = soundPool ?: return
         if (loaded) {
             pool.play(soundId, 1f, 1f, 1, 0, 1f)
