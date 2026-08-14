@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -162,20 +163,22 @@ private fun MeritBubble(
         progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
         onDone()
     }
-    val scale = startScale + (1f - startScale) * progress.value
-    val alpha = 1f - progress.value
     Box(
         modifier
             .offset(x = with(density) { startXPx.toDp() })
             .graphicsLayer {
-                // 沿选定方向斜线移动(直线上移,无左右晃动)
-                translationX = dirX * dist * progress.value
-                translationY = dirY * dist * progress.value
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
+                // 关键:progress 只在 layer 块内读取,不触发重组(否则文字每帧重排会闪烁)
+                val p = progress.value
+                translationX = dirX * dist * p
+                translationY = dirY * dist * p
+                val sc = startScale + (1f - startScale) * p
+                scaleX = sc
+                scaleY = sc
+                this.alpha = 1f - p
+                // 缩放原点在文字顶部:气泡从时间文字顶部出现,整体向下放大
+                transformOrigin = TransformOrigin(0.5f, 0f)
             },
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
         BasicText(
             text = "功德+${bubble.count}",
