@@ -24,8 +24,9 @@ data class HomeData(
     val rowSpacingDp: Int,
     val showBadges: Boolean,
     val wallpaperMode: String,
-    /** 竖屏桌面列表视口高度(占屏高百分比)。 */
+    /** 桌面列表视口高度(占屏高百分比,横竖屏分开配置)。 */
     val listHeightPercent: Int,
+    val listHeightPercentLandscape: Int,
     /** 自定义壁纸裁切(按形态独立保存):scale = 铺满基准上的用户缩放倍数;offsetX/Y = 屏宽/屏高比例的平移。 */
     val customWallpaperScale: Float,
     val customWallpaperOffsetX: Float,
@@ -63,6 +64,7 @@ class HomeStore(private val context: Context) {
         private val KEY_SHOW_BADGES = booleanPreferencesKey("show_badges")
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
         private val KEY_LIST_HEIGHT = intPreferencesKey("list_height_percent")
+        private val KEY_LIST_HEIGHT_LS = intPreferencesKey("list_height_percent_ls")
         private val KEY_WP_SCALE = floatPreferencesKey("custom_wallpaper_scale")
         private val KEY_WP_OFFSET_X = floatPreferencesKey("custom_wallpaper_offset_x")
         private val KEY_WP_OFFSET_Y = floatPreferencesKey("custom_wallpaper_offset_y")
@@ -85,6 +87,7 @@ class HomeStore(private val context: Context) {
             showBadges = p[KEY_SHOW_BADGES] ?: true,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
             listHeightPercent = p[KEY_LIST_HEIGHT] ?: DEFAULT_LIST_HEIGHT_PERCENT,
+            listHeightPercentLandscape = p[KEY_LIST_HEIGHT_LS] ?: 100,
             customWallpaperScale = p[KEY_WP_SCALE] ?: 1f,
             customWallpaperOffsetX = p[KEY_WP_OFFSET_X] ?: 0f,
             customWallpaperOffsetY = p[KEY_WP_OFFSET_Y] ?: 0f,
@@ -124,8 +127,12 @@ class HomeStore(private val context: Context) {
         context.homeDataStore.edit { it[KEY_SHOW_BADGES] = value }
     }
 
-    suspend fun setListHeightPercent(value: Int) {
-        context.homeDataStore.edit { it[KEY_LIST_HEIGHT] = value.coerceIn(25, 100) }
+    suspend fun setListHeightPercent(form: String, value: Int) {
+        val v = value.coerceIn(25, 100)
+        context.homeDataStore.edit {
+            if (form == WALLPAPER_FORM_LANDSCAPE) it[KEY_LIST_HEIGHT_LS] = v
+            else it[KEY_LIST_HEIGHT] = v
+        }
     }
 
     suspend fun setWallpaperMode(value: String) {

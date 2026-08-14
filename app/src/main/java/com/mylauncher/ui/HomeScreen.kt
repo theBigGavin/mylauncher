@@ -179,7 +179,10 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         val topSpace = maxHeight * 0.20f
         val listSpace = maxHeight * 0.05f
         val bottomSpace = maxHeight * 0.10f // 底部空白触发区(上滑开抽屉)
-        val listHeight = maxHeight * (data?.listHeightPercent ?: 50) / 100f // 竖屏列表视口高度
+        // 列表视口高度:横竖屏分开配置
+        val heightPercent = if (landscape) data?.listHeightPercentLandscape ?: 100
+        else data?.listHeightPercent ?: 50
+        val listHeight = maxHeight * heightPercent / 100f
         // 手势挂在背景层上:长按空白开设置(行内长按由行自己处理,行更深先收到事件)、上滑开抽屉
         val bgModifier = Modifier
             .fillMaxSize()
@@ -397,6 +400,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     customOffsetX = wpOffsetX,
                     customOffsetY = wpOffsetY,
                     listHeightPercent = data.listHeightPercent,
+                    listHeightPercentLandscape = data.listHeightPercentLandscape,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
@@ -405,7 +409,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
                     },
-                    onListHeight = { scope.launch { store.setListHeightPercent(it) } },
+                    onListHeight = { form, v -> scope.launch { store.setListHeightPercent(form, v) } },
                     onReset = {
                         showSettings = false
                         scope.launch {

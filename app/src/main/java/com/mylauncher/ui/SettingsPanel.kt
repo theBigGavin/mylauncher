@@ -73,13 +73,14 @@ fun SettingsScreen(
     customOffsetX: Float,
     customOffsetY: Float,
     listHeightPercent: Int,
+    listHeightPercentLandscape: Int,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
     onShowIcons: (Boolean) -> Unit,
     onShowBadges: (Boolean) -> Unit,
     onPickSystemWallpaper: () -> Unit,
-    onListHeight: (Int) -> Unit,
+    onListHeight: (form: String, value: Int) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -184,12 +185,20 @@ fun SettingsScreen(
                         onChange = { onFontSize(it.roundToInt()) },
                     )
                 }
-                SettingRow("列表高度") {
+                SettingRow("列表高度(竖屏)") {
                     MiniSlider(
                         value = listHeightPercent.toFloat(),
                         range = 25f..100f,
                         modifier = Modifier.width(150.dp),
-                        onChange = { onListHeight(it.roundToInt()) },
+                        onChange = { onListHeight(HomeStore.WALLPAPER_FORM_PORTRAIT, it.roundToInt()) },
+                    )
+                }
+                SettingRow("列表高度(横屏)") {
+                    MiniSlider(
+                        value = listHeightPercentLandscape.toFloat(),
+                        range = 25f..100f,
+                        modifier = Modifier.width(150.dp),
+                        onChange = { onListHeight(HomeStore.WALLPAPER_FORM_LANDSCAPE, it.roundToInt()) },
                     )
                 }
                 SettingRow("列表行距") {
