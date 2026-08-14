@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -83,10 +83,18 @@ fun ClockWidget(
         (timeSize * 0.32f).coerceIn(26f, 44f)
     }
 
-    // 记录时钟在窗口中的 Y,供功德气泡向屏幕顶端上升
+    // 记录时钟组件在窗口中的位置(气泡锚点需从窗口坐标换算成组件局部坐标)
+    var windowX by remember { mutableStateOf(0f) }
     var windowY by remember { mutableStateOf(0f) }
+    // 记录日期文字顶部在窗口中的位置:功德气泡从日期文字顶部冒泡
+    var dateAnchorX by remember { mutableStateOf(0f) }
+    var dateAnchorY by remember { mutableStateOf(0f) }
     BoxWithConstraints(
-        modifier.onGloballyPositioned { windowY = it.positionInWindow().y },
+        modifier.onGloballyPositioned {
+            val pos = it.positionInWindow()
+            windowX = pos.x
+            windowY = pos.y
+        },
     ) {
         Column(
             Modifier.fillMaxWidth(),
@@ -103,16 +111,24 @@ fun ClockWidget(
                 ),
             )
             Spacer(Modifier.height(if (landscape) 6.dp else 10.dp))
-            BasicText(
-                text = date,
-                style = TextStyle(
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = dateSize.sp,
-                    fontWeight = FontWeight.Light,
-                    letterSpacing = if (landscape) 3.sp else 4.sp,
-                    shadow = textShadow,
-                ),
-            )
+            Box(
+                Modifier.onGloballyPositioned {
+                    val pos = it.positionInWindow()
+                    dateAnchorX = pos.x + it.size.width / 2f
+                    dateAnchorY = pos.y  // 锚点 = 日期文字顶部
+                }
+            ) {
+                BasicText(
+                    text = date,
+                    style = TextStyle(
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = dateSize.sp,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = if (landscape) 3.sp else 4.sp,
+                        shadow = textShadow,
+                    ),
+                )
+            }
         }
         // 功德气泡层:绝对定位 + graphicsLayer 动画,不影响布局、不闪烁
         if (meritBubbles.isNotEmpty()) {
@@ -122,23 +138,31 @@ fun ClockWidget(
                     bubble = bubble,
                     clockFontSizePx = clockPx,
                     areaW = maxWidth,
-                    // 从时钟文字顶部开始冒泡,向屏幕顶端扩散
-                    clockTopWindowY = windowY,
+                    // 从日期文字处冒泡,向屏幕顶端扩散
+                    anchorWindowX = dateAnchorX,
+                    anchorWindowY = dateAnchorY,
+                    rootWindowX = windowX,
+                    rootWindowY = windowY,
                     onDone = { onMeritBubbleDone(bubble.id) },
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier.align(Alignment.TopStart),
                 )
             }
         }
     }
 }
 
-/** 单个功德气泡:从时钟文字顶部冒泡,沿选定方向(向上斜线)扩散 + 放大 + 白→透明消失。 */
+/** 单个功德气泡:从日期文字顶部冒泡,沿选定方向(向上斜线)扩散 + 放大 + 白→透明消失。 */
 @Composable
 private fun MeritBubble(
     bubble: MeritBubbleData,
     clockFontSizePx: Float,
     areaW: Dp,
-    clockTopWindowY: Float,
+    /** 锚点(日期文字顶部)在窗口中的 X/Y。 */
+    anchorWindowX: Float,
+    anchorWindowY: Float,
+    /** 时钟组件原点在窗口中的 X/Y(锚点换算组件局部坐标用)。 */
+    rootWindowX: Float,
+    rootWindowY: Float,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -147,35 +171,38 @@ private fun MeritBubble(
     // 动画只用 graphicsLayer 缩放整体放大,不修改字体大小
     val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
     val startScale = 0.30f + Random.nextFloat() * 0.30f // 初始缩放随机(0.3~0.6)
-    // 起始水平位置:时钟中间 1/3 范围内随机(垂直在时钟文字顶部)
+    // 起始水平位置:日期文字中心附近(时钟中间 1/3 范围内随机)
     val startXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
     // 扩散方向:向上偏左/偏右的斜线(±25° 随机,选定后不变,不左右乱晃)
     val angleDeg = (Random.nextFloat() * 2f - 1f) * 25f
     val rad = Math.toRadians(angleDeg.toDouble())
     val dirX = sin(rad).toFloat()
     val dirY = -cos(rad).toFloat()
-    // 扩散距离:时钟顶部到屏幕顶端的距离(随机比例)
-    val dist = clockTopWindowY * (0.8f + Random.nextFloat() * 0.4f)
+    // 扩散距离:锚点(日期文字)到屏幕顶端的距离(随机比例),冒泡升到屏幕顶端附近
+    val dist = anchorWindowY * (0.8f + Random.nextFloat() * 0.4f)
     val progress = remember { Animatable(0f) }
     // 贝塞尔曲线控制速度:快起慢收(冒泡感),运动平滑无抖动
     val bubbleEasing = CubicBezierEasing(0.0f, 0.45f, 0.25f, 1.0f)
+    // 气泡文本宽度(用于把气泡水平居中于锚点)
+    var widthPx by remember { mutableStateOf(0f) }
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
         onDone()
     }
     Box(
         modifier
-            .offset(x = with(density) { startXPx.toDp() })
+            .onSizeChanged { widthPx = it.width.toFloat() }
             .graphicsLayer {
                 // 关键:progress 只在 layer 块内读取,不触发重组(否则文字每帧重排会闪烁)
                 val p = progress.value
-                translationX = dirX * dist * p
-                translationY = dirY * dist * p
+                // 锚点 = 日期文字顶部(减半宽使气泡水平居中于锚点),再沿选定方向扩散
+                translationX = (anchorWindowX - rootWindowX) + startXPx + dirX * dist * p - widthPx / 2f
+                translationY = (anchorWindowY - rootWindowY) + dirY * dist * p
                 val sc = startScale + (1f - startScale) * p
                 scaleX = sc
                 scaleY = sc
                 this.alpha = 1f - p
-                // 缩放原点在文字顶部:气泡从时间文字顶部出现,整体向下放大
+                // 缩放原点在气泡顶部:气泡从日期文字顶部出现,整体放大
                 transformOrigin = TransformOrigin(0.5f, 0f)
             },
         contentAlignment = Alignment.TopCenter,
