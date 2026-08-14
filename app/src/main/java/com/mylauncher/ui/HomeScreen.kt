@@ -131,9 +131,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     // 后台预热全部应用图标(IO 线程):抽屉/选择器打开时直接命中缓存,
     // 避免首次打开时现场走 PackageManager 拉图标,拖慢主线程导致点击延迟
     val warmSizePx = with(LocalDensity.current) { ((data?.iconSizeDp ?: 40).dp).roundToPx() }.coerceAtLeast(24)
-    LaunchedEffect(apps, warmSizePx) {
+    LaunchedEffect(apps, warmSizePx, data?.showOriginalColor) {
         if (apps != null) {
-            warmUpIcons(context, apps, warmSizePx)
+            warmUpIcons(context, apps, warmSizePx, color = data?.showOriginalColor == true)
         }
     }
 
@@ -270,6 +270,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         fontSize = fontSize,
                         rowSpacing = rowSpacing,
                         showIcons = data.showIcons,
+                        showOriginalColor = data.showOriginalColor,
                         showBadges = data.showBadges,
                         badgeCounts = badgeCounts,
                         landscape = false,
@@ -337,6 +338,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         fontSize = fontSize,
                         rowSpacing = rowSpacing,
                         showIcons = data.showIcons,
+                        showOriginalColor = data.showOriginalColor,
                         showBadges = data.showBadges,
                         badgeCounts = badgeCounts,
                         landscape = true,
@@ -398,6 +400,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     fontSize = data.fontSizeSp,
                     rowSpacing = data.rowSpacingDp,
                     showIcons = data.showIcons,
+                    showOriginalColor = data.showOriginalColor,
                     showBadges = data.showBadges,
                     wallpaperMode = data.wallpaperMode,
                     customScale = wpScale,
@@ -410,6 +413,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
                     onShowBadges = { scope.launch { store.setShowBadges(it) } },
+                    onShowOriginalColor = { scope.launch { store.setShowOriginalColor(it) } },
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
                     },
@@ -438,6 +442,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             iconSize = data.iconSizeDp.dp,
             fontSize = data.fontSizeSp.sp,
             showIcons = data.showIcons,
+            showOriginalColor = data.showOriginalColor,
             wallpaperMode = data.wallpaperMode,
             adding = req is PickerRequest.Add,
             onPick = { entry ->
@@ -482,6 +487,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 iconSize = data.iconSizeDp.dp,
                 fontSize = data.fontSizeSp.sp,
                 showIcons = data.showIcons,
+                showOriginalColor = data.showOriginalColor,
                 wallpaperMode = data.wallpaperMode,
                 customScale = wpScale,
                 customOffsetX = wpOffsetX,

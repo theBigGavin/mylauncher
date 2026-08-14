@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.mylauncher.data.AppEntry
 import com.mylauncher.data.HomeStore
+import com.mylauncher.icons.rememberColorIcon
 import com.mylauncher.icons.rememberMonoIcon
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -344,6 +345,7 @@ fun AppList(
     fontSize: TextUnit,
     rowSpacing: Dp,
     showIcons: Boolean,
+    showOriginalColor: Boolean,
     showBadges: Boolean,
     badgeCounts: Map<String, Int>,
     landscape: Boolean,
@@ -630,7 +632,11 @@ fun AppList(
                     ) {
                         if (showIcons) {
                             IconBox(
-                                icon = rememberMonoIcon(item.app, iconSize),
+                                icon = if (showOriginalColor) {
+                                    rememberColorIcon(item.app, iconSize)
+                                } else {
+                                    rememberMonoIcon(item.app, iconSize)
+                                },
                                 size = iconSize,
                                 badgeCount = if (showBadges) (badgeCounts[item.app.packageName] ?: 0) else 0,
                             )

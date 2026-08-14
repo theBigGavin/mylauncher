@@ -35,12 +35,16 @@ object MonoIcons {
     private const val CACHE_VERSION = "v6-desat-bright-hc3"
 
     private val memoryCache = LruCache<String, Bitmap>(96)
+    private val colorCache = LruCache<String, Bitmap>(64)
 
     /** 内存缓存键:无 versionCode,纯字符串拼接,零 IPC,可在主线程组合期调用。 */
     private fun memKey(entry: AppEntry, sizePx: Int) = "${entry.component}@$sizePx"
 
     /** 仅查内存缓存(零 IPC/IO,主线程安全)。 */
     fun memoryOnly(entry: AppEntry, sizePx: Int): Bitmap? = memoryCache.get(memKey(entry, sizePx))
+
+    /** 原彩图标仅查内存缓存(零 IPC/IO,主线程安全)。 */
+    fun colorMemoryOnly(entry: AppEntry, sizePx: Int): Bitmap? = colorCache.get(memKey(entry, sizePx))
 
     /** 同步尝试命中内存/磁盘缓存(含 PackageManager IPC 与磁盘解码,仅限 IO 线程调用)。 */
     fun loadCached(context: Context, entry: AppEntry, sizePx: Int): Bitmap? {
@@ -55,6 +59,36 @@ object MonoIcons {
             }
         }
         return null
+    }
+
+    /** 原彩图标:直接取系统图标原色(带内存/磁盘缓存),调用方需在 IO 线程执行。 */
+    fun loadColor(context: Context, entry: AppEntry, sizePx: Int): Bitmap {
+        colorCache.get(memKey(entry, sizePx))?.let { return it }
+        val key = cacheKey(context, entry, sizePx)?.let { "color|$it" }
+        if (key != null) {
+            val file = diskFile(context, key)
+            if (file.exists()) {
+                val bmp = BitmapFactory.decodeFile(file.absolutePath)
+                if (bmp != null) {
+                    colorCache.put(memKey(entry, sizePx), bmp)
+                    return bmp
+                }
+            }
+        }
+        val drawable = loadIconDrawable(context, entry)
+        val rendered = drawableToBitmap(drawable, RENDER_PX)
+        val scaled =
+            if (sizePx == RENDER_PX) rendered
+            else Bitmap.createScaledBitmap(rendered, sizePx, sizePx, true)
+        colorCache.put(memKey(entry, sizePx), scaled)
+        if (key != null) {
+            runCatching {
+                val f = diskFile(context, key)
+                f.parentFile?.mkdirs()
+                f.outputStream().use { scaled.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+        }
+        return scaled
     }
 
     /** 完整加载(含去色提亮转换),调用方需在 IO 线程执行。 */
@@ -160,13 +194,35 @@ fun rememberMonoIcon(entry: AppEntry, size: Dp): ImageBitmap? {
 }
 
 /**
- * 后台预热全部应用的单色图标(IO 线程):抽屉/选择器打开时直接命中缓存,
- * 避免首次打开时现场走 PackageManager 拉图标,拖垮主线程导致点击延迟。
+ * 按当前 dp 尺寸加载原彩图标:组合期只查内存缓存,未命中走 IO 线程取系统原图。
  */
-suspend fun warmUpIcons(context: Context, apps: List<AppEntry>, sizePx: Int) =
+@Composable
+fun rememberColorIcon(entry: AppEntry, size: Dp): ImageBitmap? {
+    val context = LocalContext.current
+    val sizePx = with(LocalDensity.current) { size.roundToPx() }.coerceAtLeast(24)
+    return produceState<ImageBitmap?>(
+        MonoIcons.colorMemoryOnly(entry, sizePx)?.asImageBitmap(),
+        entry.component, sizePx,
+    ) {
+        if (value == null) {
+            value = withContext(Dispatchers.IO) {
+                MonoIcons.loadColor(context, entry, sizePx).asImageBitmap()
+            }
+        }
+    }.value
+}
+
+/**
+ * 后台预热全部应用的图标缓存(IO 线程):抽屉/选择器打开时直接命中缓存,
+ * 避免首次打开时现场走 PackageManager 拉图标,拖垮主线程导致点击延迟。
+ * color = true 时预热原彩图标,否则预热单色图标。
+ */
+suspend fun warmUpIcons(context: Context, apps: List<AppEntry>, sizePx: Int, color: Boolean = false) =
     withContext(Dispatchers.IO) {
         apps.forEach { entry ->
-            if (MonoIcons.memoryOnly(entry, sizePx) == null) {
+            if (color) {
+                MonoIcons.loadColor(context, entry, sizePx)
+            } else if (MonoIcons.memoryOnly(entry, sizePx) == null) {
                 MonoIcons.loadCached(context, entry, sizePx)
             }
         }

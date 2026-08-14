@@ -23,6 +23,8 @@ data class HomeData(
     val showIcons: Boolean,
     val rowSpacingDp: Int,
     val showBadges: Boolean,
+    /** 图标是否显示原彩(否则单色化白剪影)。 */
+    val showOriginalColor: Boolean,
     val wallpaperMode: String,
     /** 桌面列表视口高度(占屏高百分比,横竖屏分开配置)。 */
     val listHeightPercent: Int,
@@ -62,6 +64,7 @@ class HomeStore(private val context: Context) {
         private val KEY_SHOW_ICONS = booleanPreferencesKey("show_icons")
         private val KEY_ROW_SPACING = intPreferencesKey("row_spacing_dp")
         private val KEY_SHOW_BADGES = booleanPreferencesKey("show_badges")
+        private val KEY_SHOW_COLOR = booleanPreferencesKey("show_original_color")
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
         private val KEY_LIST_HEIGHT = intPreferencesKey("list_height_percent")
         private val KEY_LIST_HEIGHT_LS = intPreferencesKey("list_height_percent_ls")
@@ -85,6 +88,7 @@ class HomeStore(private val context: Context) {
             showIcons = p[KEY_SHOW_ICONS] ?: true,
             rowSpacingDp = p[KEY_ROW_SPACING] ?: DEFAULT_ROW_SPACING_DP,
             showBadges = p[KEY_SHOW_BADGES] ?: true,
+            showOriginalColor = p[KEY_SHOW_COLOR] ?: false,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
             listHeightPercent = p[KEY_LIST_HEIGHT] ?: DEFAULT_LIST_HEIGHT_PERCENT,
             listHeightPercentLandscape = p[KEY_LIST_HEIGHT_LS] ?: 100,
@@ -125,6 +129,10 @@ class HomeStore(private val context: Context) {
 
     suspend fun setShowBadges(value: Boolean) {
         context.homeDataStore.edit { it[KEY_SHOW_BADGES] = value }
+    }
+
+    suspend fun setShowOriginalColor(value: Boolean) {
+        context.homeDataStore.edit { it[KEY_SHOW_COLOR] = value }
     }
 
     suspend fun setListHeightPercent(form: String, value: Int) {
@@ -182,6 +190,7 @@ class HomeStore(private val context: Context) {
             it[KEY_SHOW_ICONS] = true
             it[KEY_ROW_SPACING] = DEFAULT_ROW_SPACING_DP
             it[KEY_SHOW_BADGES] = true
+            it[KEY_SHOW_COLOR] = false
             it[KEY_WALLPAPER] = WALLPAPER_BUILTIN
         }
     }

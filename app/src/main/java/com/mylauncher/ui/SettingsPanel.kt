@@ -68,6 +68,7 @@ fun SettingsScreen(
     rowSpacing: Int,
     showIcons: Boolean,
     showBadges: Boolean,
+    showOriginalColor: Boolean,
     wallpaperMode: String,
     customScale: Float,
     customOffsetX: Float,
@@ -79,6 +80,7 @@ fun SettingsScreen(
     onRowSpacing: (Int) -> Unit,
     onShowIcons: (Boolean) -> Unit,
     onShowBadges: (Boolean) -> Unit,
+    onShowOriginalColor: (Boolean) -> Unit,
     onPickSystemWallpaper: () -> Unit,
     onListHeight: (form: String, value: Int) -> Unit,
     onReset: () -> Unit,
@@ -227,6 +229,9 @@ fun SettingsScreen(
                 }
                 SettingRow("显示图标") {
                     MiniSwitch(checked = showIcons, onChange = onShowIcons)
+                }
+                SettingRow("图标原彩") {
+                    MiniSwitch(checked = showOriginalColor, onChange = onShowOriginalColor)
                 }
                 SettingRow("通知角标") {
                     MiniSwitch(checked = showBadges, onChange = onShowBadges)

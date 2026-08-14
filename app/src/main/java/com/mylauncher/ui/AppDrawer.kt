@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mylauncher.data.AppEntry
+import com.mylauncher.icons.rememberColorIcon
 import com.mylauncher.icons.rememberMonoIcon
 import kotlinx.coroutines.launch
 
@@ -78,6 +79,7 @@ fun AppDrawer(
     iconSize: Dp,
     fontSize: TextUnit,
     showIcons: Boolean,
+    showOriginalColor: Boolean,
     wallpaperMode: String,
     customScale: Float,
     customOffsetX: Float,
@@ -93,6 +95,7 @@ fun AppDrawer(
         iconSize = iconSize,
         fontSize = fontSize,
         showIcons = showIcons,
+        showOriginalColor = showOriginalColor,
         wallpaperMode = wallpaperMode,
         customScale = customScale,
         customOffsetX = customOffsetX,
@@ -150,6 +153,7 @@ internal fun AppListOverlay(
     iconSize: Dp,
     fontSize: TextUnit,
     showIcons: Boolean,
+    showOriginalColor: Boolean = false,
     wallpaperMode: String,
     customScale: Float = 1f,
     customOffsetX: Float = 0f,
@@ -303,7 +307,11 @@ internal fun AppListOverlay(
                         ) {
                             AppRow(
                                 name = app.label,
-                                icon = rememberMonoIcon(app, iconSize),
+                                icon = if (showOriginalColor) {
+                                    rememberColorIcon(app, iconSize)
+                                } else {
+                                    rememberMonoIcon(app, iconSize)
+                                },
                                 iconSize = iconSize,
                                 fontSize = fontSize,
                                 showIcons = showIcons,
@@ -432,7 +440,11 @@ internal fun AppListOverlay(
                                     Modifier,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    val icon = rememberMonoIcon(app, iconSize)
+                                    val icon = if (showOriginalColor) {
+                                        rememberColorIcon(app, iconSize)
+                                    } else {
+                                        rememberMonoIcon(app, iconSize)
+                                    }
                                     if (showIcons) {
                                         IconBox(icon, iconSize, 0)
                                         Spacer(Modifier.width(16.dp))
