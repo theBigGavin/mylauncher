@@ -125,7 +125,7 @@ class HomeStore(private val context: Context) {
     }
 
     suspend fun setListHeightPercent(value: Int) {
-        context.homeDataStore.edit { it[KEY_LIST_HEIGHT] = value.coerceIn(25, 50) }
+        context.homeDataStore.edit { it[KEY_LIST_HEIGHT] = value.coerceIn(25, 100) }
     }
 
     suspend fun setWallpaperMode(value: String) {

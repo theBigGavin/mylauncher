@@ -187,7 +187,7 @@ fun SettingsScreen(
                 SettingRow("列表高度") {
                     MiniSlider(
                         value = listHeightPercent.toFloat(),
-                        range = 25f..50f,
+                        range = 25f..100f,
                         modifier = Modifier.width(150.dp),
                         onChange = { onListHeight(it.roundToInt()) },
                     )
