@@ -359,7 +359,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .fillMaxHeight()
+                            .height(listHeight)
                             .width(listWidth)
                             .padding(start = 20.dp, end = hMargin, top = vMarginTop, bottom = vMarginBottom)
                     )
