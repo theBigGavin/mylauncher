@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,7 @@ import com.mylauncher.data.AppRepository
 import com.mylauncher.data.DefaultApps
 import com.mylauncher.data.HomeStore
 import com.mylauncher.data.StoredEntry
+import com.mylauncher.LauncherEvents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -165,9 +167,26 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var showSettings by remember { mutableStateOf(false) }
     // 行内长按接管中(拖动排序):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
     var rowHolding by remember { mutableStateOf(false) }
-    // 功德彩蛋:活跃气泡列表 + 触发序号(边缘滑入)
+    // 功德彩蛋:活跃气泡列表 + 触发序号(系统返回手势触发)
     var meritBubbles by remember { mutableStateOf(listOf<MeritBubbleData>()) }
     var meritSeq by remember { mutableIntStateOf(0) }
+    val currentData by rememberUpdatedState(data)
+    LaunchedEffect(Unit) {
+        LauncherEvents.backGesture.collect {
+            // 浮层打开时不触发(浮层的返回会先被 Compose BackHandler 消费)
+            if (picker == null && !drawerOpen && !showSettings) {
+                scope.launch { store.addMerit() }
+                val d = currentData
+                if (d?.easterEggEnabled == true) {
+                    meritSeq++
+                    meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
+                    if (d.meritSoundEnabled == true) {
+                        scope.launch { KnockSound.play() }
+                    }
+                }
+            }
+        }
+    }
 
     // 更换壁纸:交给系统壁纸管理器(选择 + 裁切 + 横竖屏/内屏适配全由系统处理),
     // 桌面用 FLAG_SHOW_WALLPAPER 跟随系统壁纸
@@ -204,37 +223,6 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         }
                     },
                 )
-            }
-            // 功德彩蛋:从屏幕左右边缘滑入触发
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val edge = 44.dp.toPx()
-                    val fromLeft = down.position.x < edge
-                    val fromRight = down.position.x > size.width - edge
-                    if (!fromLeft && !fromRight) return@awaitEachGesture
-                    var dx = 0f
-                    var inward = false
-                    drag(down.id) { change ->
-                        dx += change.positionChange().x
-                        if (abs(dx) > 26.dp.toPx()) {
-                            inward = if (fromLeft) dx > 0 else dx < 0
-                            change.consume()
-                        }
-                    }
-                    if (inward && picker == null && !drawerOpen && !showSettings) {
-                        scope.launch { store.addMerit() }
-                        if (data?.easterEggEnabled == true) {
-                            meritSeq++
-                            meritBubbles = meritBubbles + MeritBubbleData(
-                                meritSeq, (data?.meritCount ?: 0) + 1
-                            )
-                            if (data?.meritSoundEnabled == true) {
-                                scope.launch { KnockSound.play() }
-                            }
-                        }
-                    }
-                }
             }
             .pointerInput(Unit) {
                 var upward = false

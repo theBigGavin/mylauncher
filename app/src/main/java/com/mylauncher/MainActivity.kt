@@ -9,7 +9,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.darkColors
 import com.mylauncher.ui.HomeScreen
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+
+
 import com.mylauncher.ui.rememberInnerDisplayUnfolded
+
+/** 系统返回手势事件(边缘滑入触发):主屏收集后播功德彩蛋。 */
+object LauncherEvents {
+    val backGesture = MutableSharedFlow<Unit>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,7 +32,9 @@ class MainActivity : ComponentActivity() {
             this,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    // 无操作:保持主屏(浮层由 Compose BackHandler 自行处理)
+                    // 主屏是根界面:返回手势不退出应用,只作为功德彩蛋的触发事件
+                    // (浮层打开时 Compose 的 BackHandler 优先级更高,不会走到这里)
+                    LauncherEvents.backGesture.tryEmit(Unit)
                 }
             }
         )
