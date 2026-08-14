@@ -20,16 +20,18 @@ object KnockSound {
     /** 播放一次木鱼声(IO 线程执行,不阻塞 UI)。 */
     suspend fun play() = withContext(Dispatchers.IO) {
         runCatching {
-            val duration = 0.14f // 140ms
+            val duration = 0.30f // 300ms
             val n = (SAMPLE_RATE * duration).toInt()
             val samples = ShortArray(n)
             for (i in 0 until n) {
                 val t = i / SAMPLE_RATE.toFloat()
-                // 空腔共鸣:180Hz 主频 + 快速衰减
-                val body = sin(2.0 * PI * 180.0 * t) * exp(-t * 26f)
+                // 空腔共鸣:130Hz 主频 + 双频叠加(更饱满低沉,接近木鱼)
+                val body = (sin(2.0 * PI * 130.0 * t) + 0.6 * sin(2.0 * PI * 260.0 * t)) * exp(-t * 14f)
                 // 起始瞬态:高频小噪声让敲击更有"哒"感
-                val click = sin(2.0 * PI * 900.0 * t) * exp(-t * 130f) * 0.5
-                samples[i] = (((body + click) * 0.55) * Short.MAX_VALUE).toInt().toShort()
+                val click = sin(2.0 * PI * 700.0 * t) * exp(-t * 100f) * 0.6
+                // 中段轻微回响
+                val echo = sin(2.0 * PI * 130.0 * t) * exp(-(t - 0.10f).coerceAtLeast(0f) * 26f) * 0.4f
+                samples[i] = (((body + click + echo) * 0.9) * Short.MAX_VALUE).toInt().toShort()
             }
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
