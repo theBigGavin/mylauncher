@@ -25,6 +25,11 @@ data class HomeData(
     val showBadges: Boolean,
     /** 图标是否显示原彩(否则单色化白剪影)。 */
     val showOriginalColor: Boolean,
+    /** 功德彩蛋:当日累计计数 + 日期(隔日清零)。 */
+    val meritCount: Int,
+    val meritDate: String,
+    val easterEggEnabled: Boolean,
+    val meritSoundEnabled: Boolean,
     val wallpaperMode: String,
     /** 桌面列表视口高度(占屏高百分比,横竖屏分开配置)。 */
     val listHeightPercent: Int,
@@ -65,6 +70,10 @@ class HomeStore(private val context: Context) {
         private val KEY_ROW_SPACING = intPreferencesKey("row_spacing_dp")
         private val KEY_SHOW_BADGES = booleanPreferencesKey("show_badges")
         private val KEY_SHOW_COLOR = booleanPreferencesKey("show_original_color")
+        private val KEY_MERIT_COUNT = intPreferencesKey("merit_count")
+        private val KEY_MERIT_DATE = stringPreferencesKey("merit_date")
+        private val KEY_EASTER_EGG = booleanPreferencesKey("easter_egg_enabled")
+        private val KEY_MERIT_SOUND = booleanPreferencesKey("merit_sound_enabled")
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
         private val KEY_LIST_HEIGHT = intPreferencesKey("list_height_percent")
         private val KEY_LIST_HEIGHT_LS = intPreferencesKey("list_height_percent_ls")
@@ -89,6 +98,10 @@ class HomeStore(private val context: Context) {
             rowSpacingDp = p[KEY_ROW_SPACING] ?: DEFAULT_ROW_SPACING_DP,
             showBadges = p[KEY_SHOW_BADGES] ?: true,
             showOriginalColor = p[KEY_SHOW_COLOR] ?: false,
+            meritCount = p[KEY_MERIT_COUNT] ?: 0,
+            meritDate = p[KEY_MERIT_DATE] ?: "",
+            easterEggEnabled = p[KEY_EASTER_EGG] ?: true,
+            meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
             listHeightPercent = p[KEY_LIST_HEIGHT] ?: DEFAULT_LIST_HEIGHT_PERCENT,
             listHeightPercentLandscape = p[KEY_LIST_HEIGHT_LS] ?: 100,
@@ -133,6 +146,27 @@ class HomeStore(private val context: Context) {
 
     suspend fun setShowOriginalColor(value: Boolean) {
         context.homeDataStore.edit { it[KEY_SHOW_COLOR] = value }
+    }
+
+    /** 功德 +1:当日累计,隔日清零。 */
+    suspend fun addMerit() {
+        val today = java.time.LocalDate.now().toString()
+        context.homeDataStore.edit {
+            if (it[KEY_MERIT_DATE] != today) {
+                it[KEY_MERIT_DATE] = today
+                it[KEY_MERIT_COUNT] = 1
+            } else {
+                it[KEY_MERIT_COUNT] = (it[KEY_MERIT_COUNT] ?: 0) + 1
+            }
+        }
+    }
+
+    suspend fun setEasterEggEnabled(value: Boolean) {
+        context.homeDataStore.edit { it[KEY_EASTER_EGG] = value }
+    }
+
+    suspend fun setMeritSoundEnabled(value: Boolean) {
+        context.homeDataStore.edit { it[KEY_MERIT_SOUND] = value }
     }
 
     suspend fun setListHeightPercent(form: String, value: Int) {
@@ -191,6 +225,9 @@ class HomeStore(private val context: Context) {
             it[KEY_ROW_SPACING] = DEFAULT_ROW_SPACING_DP
             it[KEY_SHOW_BADGES] = true
             it[KEY_SHOW_COLOR] = false
+            it[KEY_EASTER_EGG] = true
+            it[KEY_MERIT_SOUND] = true
+            it[KEY_MERIT_COUNT] = 0
             it[KEY_WALLPAPER] = WALLPAPER_BUILTIN
         }
     }

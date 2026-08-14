@@ -75,12 +75,16 @@ fun SettingsScreen(
     customOffsetY: Float,
     listHeightPercent: Int,
     listHeightPercentLandscape: Int,
+    easterEggEnabled: Boolean,
+    meritSoundEnabled: Boolean,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
     onShowIcons: (Boolean) -> Unit,
     onShowBadges: (Boolean) -> Unit,
     onShowOriginalColor: (Boolean) -> Unit,
+    onEasterEgg: (Boolean) -> Unit,
+    onMeritSound: (Boolean) -> Unit,
     onPickSystemWallpaper: () -> Unit,
     onListHeight: (form: String, value: Int) -> Unit,
     onReset: () -> Unit,
@@ -232,6 +236,12 @@ fun SettingsScreen(
                 }
                 SettingRow("图标原彩") {
                     MiniSwitch(checked = showOriginalColor, onChange = onShowOriginalColor)
+                }
+                SettingRow("功德彩蛋(边缘滑入)") {
+                    MiniSwitch(checked = easterEggEnabled, onChange = onEasterEgg)
+                }
+                SettingRow("木鱼音效") {
+                    MiniSwitch(checked = meritSoundEnabled, onChange = onMeritSound)
                 }
                 SettingRow("通知角标") {
                     MiniSwitch(checked = showBadges, onChange = onShowBadges)

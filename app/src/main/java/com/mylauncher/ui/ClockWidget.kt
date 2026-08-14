@@ -1,8 +1,14 @@
 package com.mylauncher.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,13 +19,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Calendar
+import kotlin.random.Random
+
+/** 一个功德气泡:从小放大扩散、白→透明消失,位置/字号随机(不影响布局)。 */
+data class MeritBubbleData(val id: Int, val count: Int)
 
 /** 实时时钟:HH:mm + "星期X · M月D日"。竖屏居中超大细体;横屏左下较小。 */
 @Composable
@@ -28,6 +41,9 @@ fun ClockWidget(
     modifier: Modifier = Modifier,
     /** 横屏时时钟可用的最大宽度(dp,由调用方按屏幕宽 - 列表宽 - 边距算出);竖屏忽略。 */
     availableWidthDp: Float? = null,
+    /** 功德彩蛋气泡(边缘滑入触发)。 */
+    meritBubbles: List<MeritBubbleData> = emptyList(),
+    onMeritBubbleDone: (Int) -> Unit = {},
 ) {
     var now by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(Unit) {
@@ -61,28 +77,89 @@ fun ClockWidget(
         (timeSize * 0.32f).coerceIn(26f, 44f)
     }
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = if (landscape) Alignment.Start else Alignment.CenterHorizontally,
+    BoxWithConstraints(modifier) {
+        Column(
+            horizontalAlignment = if (landscape) Alignment.Start else Alignment.CenterHorizontally,
+        ) {
+            BasicText(
+                text = time,
+                style = TextStyle(
+                    color = Color.White,
+                    fontSize = timeSize.sp,
+                    fontWeight = FontWeight.Thin,
+                    letterSpacing = (-1).sp,
+                    lineHeight = timeSize.sp,
+                ),
+            )
+            Spacer(Modifier.height(if (landscape) 6.dp else 10.dp))
+            BasicText(
+                text = date,
+                style = TextStyle(
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = dateSize.sp,
+                    fontWeight = FontWeight.Light,
+                    letterSpacing = if (landscape) 3.sp else 4.sp,
+                    shadow = textShadow,
+                ),
+            )
+        }
+        // 功德气泡层:绝对定位 + graphicsLayer 动画,不影响布局、不闪烁
+        if (meritBubbles.isNotEmpty()) {
+            val clockPx = with(LocalDensity.current) { timeSize.sp.toPx() }
+            meritBubbles.forEach { bubble ->
+                MeritBubble(
+                    bubble = bubble,
+                    clockFontSizePx = clockPx,
+                    areaW = maxWidth,
+                    areaH = maxHeight,
+                    onDone = { onMeritBubbleDone(bubble.id) },
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+        }
+    }
+}
+
+/** 单个功德气泡:初始字号随机,放大到时钟字号的 70%~90%,白→透明扩散消失。 */
+@Composable
+private fun MeritBubble(
+    bubble: MeritBubbleData,
+    clockFontSizePx: Float,
+    areaW: Dp,
+    areaH: Dp,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    // 最终字号 = 时钟字号的 70%~90% 随机;初始字号更小(随机)
+    val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
+    val startSize = endSize * (0.30f + Random.nextFloat() * 0.30f)
+    // 出现位置:时钟中间 1/3 范围内随机
+    val offXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
+    val offYPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaH.toPx() } / 6f
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
+        onDone()
+    }
+    val scale = startSize / endSize + (1f - startSize / endSize) * progress.value
+    val alpha = 1f - progress.value
+    Box(
+        modifier
+            .offset(x = with(density) { offXPx.toDp() }, y = with(density) { offYPx.toDp() })
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            },
+        contentAlignment = Alignment.Center,
     ) {
         BasicText(
-            text = time,
+            text = "功德+${bubble.count}",
             style = TextStyle(
                 color = Color.White,
-                fontSize = timeSize.sp,
-                fontWeight = FontWeight.Thin,
-                letterSpacing = (-1).sp,
-                lineHeight = timeSize.sp,
-            ),
-        )
-        Spacer(Modifier.height(if (landscape) 6.dp else 10.dp))
-        BasicText(
-            text = date,
-            style = TextStyle(
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = dateSize.sp,
-                fontWeight = FontWeight.Light,
-                letterSpacing = if (landscape) 3.sp else 4.sp,
+                fontSize = with(density) { endSize.toSp() },
+                fontWeight = FontWeight.Black,
                 shadow = textShadow,
             ),
         )

@@ -11,8 +11,13 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.abs
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -160,6 +165,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var showSettings by remember { mutableStateOf(false) }
     // 行内长按接管中(拖动排序):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
     var rowHolding by remember { mutableStateOf(false) }
+    // 功德彩蛋:活跃气泡列表 + 触发序号(边缘滑入)
+    var meritBubbles by remember { mutableStateOf(listOf<MeritBubbleData>()) }
+    var meritSeq by remember { mutableIntStateOf(0) }
 
     // 更换壁纸:交给系统壁纸管理器(选择 + 裁切 + 横竖屏/内屏适配全由系统处理),
     // 桌面用 FLAG_SHOW_WALLPAPER 跟随系统壁纸
@@ -197,12 +205,42 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     },
                 )
             }
+            // 功德彩蛋:从屏幕左右边缘滑入触发
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val edge = 44.dp.toPx()
+                    val fromLeft = down.position.x < edge
+                    val fromRight = down.position.x > size.width - edge
+                    if (!fromLeft && !fromRight) return@awaitEachGesture
+                    var dx = 0f
+                    var inward = false
+                    drag(down.id) { change ->
+                        dx += change.positionChange().x
+                        if (abs(dx) > 26.dp.toPx()) {
+                            inward = if (fromLeft) dx > 0 else dx < 0
+                            change.consume()
+                        }
+                    }
+                    if (inward && picker == null && !drawerOpen && !showSettings) {
+                        scope.launch { store.addMerit() }
+                        if (data?.easterEggEnabled == true) {
+                            meritSeq++
+                            meritBubbles = meritBubbles + MeritBubbleData(
+                                meritSeq, (data?.meritCount ?: 0) + 1
+                            )
+                            if (data?.meritSoundEnabled == true) {
+                                scope.launch { KnockSound.play() }
+                            }
+                        }
+                    }
+                }
+            }
             .pointerInput(Unit) {
                 var upward = false
                 var startY = 0f
-                // 只在屏幕下方约 2/3 区域上滑才开抽屉:顶部是时钟/状态区,
-                // 上拉容易误触抽屉,破坏体验
-                val triggerTop = size.height * 0.35f
+                // 只在屏幕底部 30% 区域上滑才开抽屉:顶部/中部是时钟与列表,避免误触
+                val triggerTop = size.height * 0.70f
                 detectVerticalDragGestures(
                     onDragStart = { startY = it.y },
                     onDragEnd = {
@@ -262,7 +300,14 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 // 竖屏:居中超大时钟 + 竖行列表 + 底部计数
                 Column(Modifier.fillMaxSize().alpha(homeAlpha)) {
                     Spacer(Modifier.height(topSpace))
-                    ClockWidget(landscape = false, modifier = Modifier.fillMaxWidth())
+                    ClockWidget(
+                        landscape = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        meritBubbles = meritBubbles,
+                        onMeritBubbleDone = { id ->
+                            meritBubbles = meritBubbles.filterNot { it.id == id }
+                        },
+                    )
                     Spacer(Modifier.height(listSpace))
                     AppList(
                         items = items,
@@ -328,6 +373,10 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     ClockWidget(
                         landscape = true,
                         availableWidthDp = clockAvailWidth.value,
+                        meritBubbles = meritBubbles,
+                        onMeritBubbleDone = { id ->
+                            meritBubbles = meritBubbles.filterNot { it.id == id }
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(start = hMargin, bottom = vMarginBottom),
@@ -408,12 +457,16 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     customOffsetY = wpOffsetY,
                     listHeightPercent = data.listHeightPercent,
                     listHeightPercentLandscape = data.listHeightPercentLandscape,
+                    easterEggEnabled = data.easterEggEnabled,
+                    meritSoundEnabled = data.meritSoundEnabled,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
                     onShowBadges = { scope.launch { store.setShowBadges(it) } },
                     onShowOriginalColor = { scope.launch { store.setShowOriginalColor(it) } },
+                    onEasterEgg = { scope.launch { store.setEasterEggEnabled(it) } },
+                    onMeritSound = { scope.launch { store.setMeritSoundEnabled(it) } },
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
                     },
