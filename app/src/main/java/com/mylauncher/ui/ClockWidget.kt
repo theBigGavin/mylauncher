@@ -142,9 +142,10 @@ private fun MeritBubble(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    // 最终字号 = 时钟字号的 70%~90% 随机;初始字号更小(随机)
+    // 字号固定为最终大小(时钟字号的 70%~90% 随机,定下后不再变);
+    // 动画只用 graphicsLayer 缩放整体放大,不修改字体大小
     val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
-    val startSize = endSize * (0.30f + Random.nextFloat() * 0.30f)
+    val startScale = 0.30f + Random.nextFloat() * 0.30f // 初始缩放随机(0.3~0.6)
     // 起始水平位置:时钟中间 1/3 范围内随机(垂直在时钟文字顶部)
     val startXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
     // 扩散方向:向上偏左/偏右的斜线(±25° 随机,选定后不变,不左右乱晃)
@@ -161,7 +162,7 @@ private fun MeritBubble(
         progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
         onDone()
     }
-    val scale = startSize / endSize + (1f - startSize / endSize) * progress.value
+    val scale = startScale + (1f - startScale) * progress.value
     val alpha = 1f - progress.value
     Box(
         modifier
