@@ -133,11 +133,15 @@ fun SettingsScreen(
         GlassPageBackground(
             wallpaperMode = wallpaperMode,
             modifier = Modifier.fillMaxSize(),
+            customScale = customScale,
+            customOffsetX = customOffsetX,
+            customOffsetY = customOffsetY,
         )
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = LIST_H_MARGIN)
+                .verticalScroll(rememberScrollState())
+                .padding(start = LIST_H_MARGIN, end = LIST_H_MARGIN, bottom = 80.dp)
         ) {
             Spacer(Modifier.height((config.screenHeightDp * 0.10f).dp))
             BasicText(
