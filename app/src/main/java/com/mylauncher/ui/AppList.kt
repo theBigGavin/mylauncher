@@ -572,7 +572,9 @@ fun AppList(
                                                             if (change.id != down.id) continue
                                                             if (change.changedToUp()) { up = true; break }
                                                             change.consume()
-                                                            val dy = change.position.y - down.position.y
+                                                            // 注意:坐标已被本行 graphicsLayer(lift)反向平移,
+                                                            // 必须加回 lift 才是真实跟手位移,否则行只跟手一半并抖动
+                                                            val dy = change.position.y - down.position.y + lift.value
                                                             scope.launch { lift.snapTo(dy) }
                                                             finalTarget = (index + (dy / rowHeightPx).roundToInt())
                                                                 .coerceIn(0, currentItems.size - 1)
