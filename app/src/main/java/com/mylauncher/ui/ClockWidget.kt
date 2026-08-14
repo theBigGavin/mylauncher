@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -20,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -77,8 +80,13 @@ fun ClockWidget(
         (timeSize * 0.32f).coerceIn(26f, 44f)
     }
 
-    BoxWithConstraints(modifier) {
+    // 记录时钟在窗口中的 Y,供功德气泡向屏幕顶端上升
+    var windowY by remember { mutableStateOf(0f) }
+    BoxWithConstraints(
+        modifier.onGloballyPositioned { windowY = it.positionInWindow().y },
+    ) {
         Column(
+            Modifier.fillMaxWidth(),
             horizontalAlignment = if (landscape) Alignment.Start else Alignment.CenterHorizontally,
         ) {
             BasicText(
@@ -112,6 +120,8 @@ fun ClockWidget(
                     clockFontSizePx = clockPx,
                     areaW = maxWidth,
                     areaH = maxHeight,
+                    // 从时钟位置向屏幕顶端上升
+                    riseFromWindowY = windowY + with(LocalDensity.current) { maxHeight.toPx() } / 2f,
                     onDone = { onMeritBubbleDone(bubble.id) },
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -120,13 +130,14 @@ fun ClockWidget(
     }
 }
 
-/** 单个功德气泡:初始字号随机,放大到时钟字号的 70%~90%,白→透明扩散消失。 */
+/** 单个功德气泡:出现在时钟中间 1/3,向屏幕顶端上升 + 放大 + 白→透明消失。 */
 @Composable
 private fun MeritBubble(
     bubble: MeritBubbleData,
     clockFontSizePx: Float,
     areaW: Dp,
     areaH: Dp,
+    riseFromWindowY: Float,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -134,9 +145,11 @@ private fun MeritBubble(
     // 最终字号 = 时钟字号的 70%~90% 随机;初始字号更小(随机)
     val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
     val startSize = endSize * (0.30f + Random.nextFloat() * 0.30f)
-    // 出现位置:时钟中间 1/3 范围内随机
+    // 出现位置:时钟中间 1/3 范围内随机(相对时钟中心)
     val offXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
     val offYPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaH.toPx() } / 6f
+    // 上升:从当前位置一路升到屏幕顶端(translationY 不占布局)
+    val startWindowY = riseFromWindowY + offYPx
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
@@ -146,8 +159,9 @@ private fun MeritBubble(
     val alpha = 1f - progress.value
     Box(
         modifier
-            .offset(x = with(density) { offXPx.toDp() }, y = with(density) { offYPx.toDp() })
+            .offset(x = with(density) { offXPx.toDp() })
             .graphicsLayer {
+                translationY = -startWindowY * progress.value
                 scaleX = scale
                 scaleY = scale
                 this.alpha = alpha
