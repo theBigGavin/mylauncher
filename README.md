@@ -29,10 +29,3 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 - `app/src/main/java/com/mylauncher/` — 源码(data / icons / ui)
 - `design/` — 设计稿与效果图生成脚本(`mockup.html` 为可交互原型)
-- `docs/screenshots/` — 模拟器实机验证截图
-
-## 截图
-
-| 竖屏主屏 | 长按菜单 | 横屏 |
-|---|---|---|
-| ![](docs/screenshots/shot_portrait.png) | ![](docs/screenshots/verify_menu_longpress.png) | ![](docs/screenshots/verify_landscape.png) |
