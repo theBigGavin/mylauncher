@@ -235,26 +235,13 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     },
                 )
             }
-            // 边缘滑入:手势一开始移动就敲木鱼(跟手),不等待返回手势完成
+            // 边缘滑入:手指按下屏幕左右边缘的瞬间即敲木鱼(最跟手,不做移动判定)
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val edge = 44.dp.toPx()
-                    val fromLeft = down.position.x < edge
-                    val fromRight = down.position.x > size.width - edge
-                    if (!fromLeft && !fromRight) return@awaitEachGesture
-                    var dx = 0f
-                    var knocked = false
-                    drag(down.id) { change ->
-                        if (!knocked) {
-                            dx += change.positionChange().x
-                            val inward = if (fromLeft) dx > 0 else dx < 0
-                            if (inward && abs(dx) > 18.dp.toPx()) {
-                                knocked = true
-                                knockNow()
-                            }
-                        }
-                        change.consume()
+                    if (down.position.x < edge || down.position.x > size.width - edge) {
+                        knockNow()
                     }
                 }
             }
