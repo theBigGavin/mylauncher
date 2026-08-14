@@ -2,7 +2,6 @@ package com.mylauncher
 
 import android.graphics.Color
 import android.os.Bundle
-import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -34,14 +33,10 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(
             this,
             object : androidx.activity.OnBackPressedCallback(true) {
-                // 预测性返回:手势一开始(手指刚滑入)就触发功德,跟手不延迟
-                override fun handleOnBackStarted(progressEvent: BackEventCompat) {
-                    LauncherEvents.backGesture.tryEmit(Unit)
-                }
-
                 override fun handleOnBackPressed() {
-                    // 主屏是根界面:返回手势不退出应用
-                    // (浮层打开时 Compose 的 BackHandler 优先级更高,不会走到这里)
+                    android.util.Log.w("MyLauncher", "back pressed")
+                    // 主屏是根界面:返回手势不退出应用,只作为功德彩蛋的触发事件
+                    LauncherEvents.backGesture.tryEmit(Unit)
                 }
             }
         )
