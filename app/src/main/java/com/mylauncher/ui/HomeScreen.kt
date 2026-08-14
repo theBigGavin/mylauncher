@@ -86,6 +86,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { repo.refresh() }
+        KnockSound.init(context)
     }
 
     // 监听安装 / 卸载 / 更新,刷新应用列表
@@ -181,7 +182,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     meritSeq++
                     meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
                     if (d.meritSoundEnabled == true) {
-                        scope.launch { KnockSound.play() }
+                        KnockSound.play()
                     }
                 }
             }
