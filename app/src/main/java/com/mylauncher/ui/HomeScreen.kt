@@ -172,6 +172,17 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var meritBubbles by remember { mutableStateOf(listOf<MeritBubbleData>()) }
     var meritSeq by remember { mutableIntStateOf(0) }
     val currentData by rememberUpdatedState(data)
+    // 手势一开始:立即敲木鱼(跟手)
+    LaunchedEffect(Unit) {
+        LauncherEvents.backStarted.collect {
+            if (picker == null && !drawerOpen && !showSettings) {
+                if (currentData?.easterEggEnabled == true && currentData?.meritSoundEnabled == true) {
+                    KnockSound.play()
+                }
+            }
+        }
+    }
+    // 手势完成:功德+1 + 冒泡(声音已先敲响,气泡稍后出现)
     LaunchedEffect(Unit) {
         LauncherEvents.backGesture.collect {
             // 浮层打开时不触发(浮层的返回会先被 Compose BackHandler 消费)
@@ -181,9 +192,6 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 if (d?.easterEggEnabled == true) {
                     meritSeq++
                     meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
-                    if (d.meritSoundEnabled == true) {
-                        KnockSound.play()
-                    }
                 }
             }
         }

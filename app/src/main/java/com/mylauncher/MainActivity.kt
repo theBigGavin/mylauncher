@@ -2,6 +2,7 @@ package com.mylauncher
 
 import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -18,6 +19,8 @@ import com.mylauncher.ui.rememberInnerDisplayUnfolded
 /** 系统返回手势事件(边缘滑入触发):主屏收集后播功德彩蛋。 */
 object LauncherEvents {
     val backGesture = MutableSharedFlow<Unit>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    /** 返回手势刚开始(手指刚滑入):立即敲木鱼,跟手。 */
+    val backStarted = MutableSharedFlow<Unit>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 }
 
 class MainActivity : ComponentActivity() {
@@ -31,10 +34,14 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(
             this,
             object : androidx.activity.OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    // 主屏是根界面:返回手势不退出应用,只作为功德彩蛋的触发事件
-                    // (浮层打开时 Compose 的 BackHandler 优先级更高,不会走到这里)
+                // 预测性返回:手势一开始(手指刚滑入)就触发功德,跟手不延迟
+                override fun handleOnBackStarted(progressEvent: BackEventCompat) {
                     LauncherEvents.backGesture.tryEmit(Unit)
+                }
+
+                override fun handleOnBackPressed() {
+                    // 主屏是根界面:返回手势不退出应用
+                    // (浮层打开时 Compose 的 BackHandler 优先级更高,不会走到这里)
                 }
             }
         )
