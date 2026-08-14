@@ -271,29 +271,19 @@ fun SettingsScreen(
                         strong = false,
                     )
                 }
-                TextButton(
-                    text = if (isDefaultLauncher) "返回主屏" else "设为默认桌面",
-                    onClick = {
-                        if (isDefaultLauncher) {
-                            // 已是默认,直接回主屏
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_MAIN).apply {
-                                        addCategory(Intent.CATEGORY_HOME)
-                                        addCategory(Intent.CATEGORY_DEFAULT)
-                                    }
-                                )
-                            }
-                        } else {
+                if (!isDefaultLauncher) {
+                    TextButton(
+                        text = "设为默认桌面",
+                        onClick = {
                             // 打开系统"默认主屏幕应用"设置页 —— 能真正修改默认
                             // (角色请求对话框在部分国产 ROM 上失效;CHOOSER 不持久化)
                             runCatching {
                                 context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
                             }
-                        }
-                    },
-                    strong = true,
-                )
+                        },
+                        strong = true,
+                    )
+                }
                 TextButton(
                     text = "恢复默认布局",
                     onClick = onReset,
