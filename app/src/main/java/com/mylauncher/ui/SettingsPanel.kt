@@ -64,6 +64,7 @@ fun SettingsScreen(
     onShowIcons: (Boolean) -> Unit,
     onShowBadges: (Boolean) -> Unit,
     onWallpaperMode: (String) -> Unit,
+    onPickCustomWallpaper: () -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -114,7 +115,10 @@ fun SettingsScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Wallpaper(Modifier.fillMaxSize(), showMiddleLine = false)
+        GlassPageBackground(
+            wallpaperMode = wallpaperMode,
+            modifier = Modifier.fillMaxSize(),
+        )
         Column(
             Modifier
                 .fillMaxSize()
@@ -204,6 +208,11 @@ fun SettingsScreen(
                         strong = false,
                     )
                 }
+                TextButton(
+                    text = if (wallpaperMode == HomeStore.WALLPAPER_CUSTOM) "自定义壁纸 ✓(点按换一张)" else "自定义壁纸…",
+                    onClick = onPickCustomWallpaper,
+                    strong = wallpaperMode == HomeStore.WALLPAPER_CUSTOM,
+                )
                 SettingRow("默认桌面") {
                     BasicText(
                         text = if (isDefaultLauncher) "已设为默认" else (defaultLabel ?: "未设置"),

@@ -150,27 +150,16 @@ fun appRowHeight(iconSize: Dp, fontSize: TextUnit, spacing: Dp = 0.dp): Dp {
 internal fun IconBox(icon: ImageBitmap?, size: Dp, badgeCount: Int) {
     // 外层不裁剪:角标要探出图标右上角,不能被圆角/边界裁掉
     Box(modifier = Modifier.size(size)) {
-        // 图标层:圆角 + 阴影 + 背景(裁剪只影响这一层)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .shadow(
-                    elevation = 6.dp,
-                    shape = RoundedCornerShape(24),
-                    ambientColor = Color.Black.copy(alpha = 0.45f),
-                    spotColor = Color.Black.copy(alpha = 0.45f),
-                )
-                .clip(RoundedCornerShape(24))
-                .background(Color.White.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (icon != null) {
-                Image(
-                    bitmap = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(size),
-                )
-            }
+        // 无底衬、无阴影:纯白剪影 glyph 直接画在壁纸上(不再透底的半透明圆角块);
+        // clip 仅让 alpha 全满的兜底图标保持圆角方块外形
+        if (icon != null) {
+            Image(
+                bitmap = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(24)),
+            )
         }
         // 通知角标:红色圆点,贴在图标右上角(外层子元素,不被裁剪)
         if (badgeCount > 0) {
@@ -300,7 +289,6 @@ private fun AddRow(
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
         )
     }
 }
@@ -505,8 +493,7 @@ fun AppList(
                                 val press = PressInteraction.Press(down.position)
                                 scope.launch { interactionSource.emit(press) }
                                 when (val outcome = awaitPressOutcome(down)) {
-                                    PressOutcome.Tap -> {
-                                        scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
+                                    PressOutcome.Tap -> {                                        scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
                                         if (currentRevealed) setRevealed(-1)
                                         else currentOnLaunch(item)
                                     }

@@ -48,4 +48,5 @@ dependencies {
     implementation("androidx.compose.material:material")
     implementation("androidx.compose.runtime:runtime")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.window:window:1.3.0")
 }

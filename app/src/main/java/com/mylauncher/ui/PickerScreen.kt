@@ -12,6 +12,7 @@ fun PickerScreen(
     iconSize: Dp,
     fontSize: TextUnit,
     showIcons: Boolean,
+    wallpaperMode: String,
     adding: Boolean,
     onPick: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
@@ -23,6 +24,7 @@ fun PickerScreen(
         iconSize = iconSize,
         fontSize = fontSize,
         showIcons = showIcons,
+        wallpaperMode = wallpaperMode,
         onRowClick = onPick,
         onDismiss = onDismiss,
     )

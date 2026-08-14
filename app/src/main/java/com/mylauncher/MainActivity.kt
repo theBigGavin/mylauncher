@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.darkColors
 import com.mylauncher.ui.HomeScreen
+import com.mylauncher.ui.rememberInnerDisplayUnfolded
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,7 +21,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             // MaterialTheme 提供 Material 水波纹(dark 配色 → 白色涟漪,适配深色壁纸)
             MaterialTheme(colors = darkColors()) {
-                HomeScreen()
+                HomeScreen(innerDisplayUnfolded = rememberInnerDisplayUnfolded())
             }
         }
     }

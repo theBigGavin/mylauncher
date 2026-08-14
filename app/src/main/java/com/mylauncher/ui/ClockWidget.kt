@@ -23,7 +23,12 @@ import java.util.Calendar
 
 /** 实时时钟:HH:mm + "星期X · M月D日"。竖屏居中超大细体;横屏左下较小。 */
 @Composable
-fun ClockWidget(landscape: Boolean, modifier: Modifier = Modifier) {
+fun ClockWidget(
+    landscape: Boolean,
+    modifier: Modifier = Modifier,
+    /** 横屏时时钟可用的最大宽度(dp,由调用方按屏幕宽 - 列表宽 - 边距算出);竖屏忽略。 */
+    availableWidthDp: Float? = null,
+) {
     var now by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -37,9 +42,15 @@ fun ClockWidget(landscape: Boolean, modifier: Modifier = Modifier) {
     val date = "星期$week · ${now.get(Calendar.MONTH) + 1}月${now.get(Calendar.DAY_OF_MONTH)}日"
 
     val config = LocalConfiguration.current
-    // 竖屏对应 CSS min(26vw, 120px);横屏自适应,至少占屏高 1/5
+    // 竖屏对应 CSS min(26vw, 120px);横屏:高度基准(至少 84sp / 屏高 20%)与
+    // 可用宽度基准("00:00" 约 2.35em:细体数字 ~0.5em、冒号 ~0.35em)取小,防与列表重叠
     val timeSize = if (landscape) {
-        maxOf(84f, config.screenHeightDp * 0.20f)
+        val byHeight = maxOf(84f, config.screenHeightDp * 0.20f)
+        if (availableWidthDp != null) {
+            minOf(byHeight, availableWidthDp / 2.35f).coerceAtLeast(40f)
+        } else {
+            byHeight
+        }
     } else {
         minOf(120f, config.screenWidthDp * 0.26f)
     }

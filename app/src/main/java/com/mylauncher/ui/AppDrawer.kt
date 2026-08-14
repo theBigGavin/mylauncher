@@ -78,6 +78,7 @@ fun AppDrawer(
     iconSize: Dp,
     fontSize: TextUnit,
     showIcons: Boolean,
+    wallpaperMode: String,
     onAddToHome: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -89,6 +90,7 @@ fun AppDrawer(
         iconSize = iconSize,
         fontSize = fontSize,
         showIcons = showIcons,
+        wallpaperMode = wallpaperMode,
         rowActions = { entry ->
             listOf(
                 RowAction(label = "放入桌面", onClick = { onAddToHome(it) }),
@@ -128,6 +130,7 @@ internal fun AppListOverlay(
     iconSize: Dp,
     fontSize: TextUnit,
     showIcons: Boolean,
+    wallpaperMode: String,
     onDismiss: () -> Unit,
     onRowClick: ((AppEntry) -> Unit)? = null,
     rowActions: ((AppEntry) -> List<RowAction>)? = null,
@@ -154,7 +157,7 @@ internal fun AppListOverlay(
     val actionWidthPx = with(density) { 264.dp.toPx() } // 三个按钮
 
     Box(Modifier.fillMaxSize()) {
-        Wallpaper(Modifier.fillMaxSize(), showMiddleLine = false)
+        GlassPageBackground(wallpaperMode, Modifier.fillMaxSize())
         // 空白处点按关闭(不吞列表滚动事件);空白处下滑同样收起
         Box(
             Modifier

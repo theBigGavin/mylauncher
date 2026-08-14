@@ -4,11 +4,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -34,8 +40,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -46,6 +54,7 @@ import androidx.core.content.ContextCompat
 import com.mylauncher.badges.BadgeStore
 import com.mylauncher.data.AppEntry
 import com.mylauncher.data.AppRepository
+import com.mylauncher.data.CustomWallpaper
 import com.mylauncher.data.DefaultApps
 import com.mylauncher.data.HomeStore
 import com.mylauncher.data.StoredEntry
@@ -60,7 +69,7 @@ private sealed interface PickerRequest {
 
 /** 主屏总装配:方向感知布局 + 全部浮层(改名 / 选择器 / 设置 / 抽屉)。 */
 @Composable
-fun HomeScreen() {
+fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val context = LocalContext.current
     val repo = remember { AppRepository(context) }
     val store = remember { HomeStore(context) }
@@ -78,7 +87,7 @@ fun HomeScreen() {
     DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
-                repo.refresh()
+                repo.refreshAsync()
             }
         }
         val filter = IntentFilter(Intent.ACTION_PACKAGE_ADDED).apply {
@@ -124,13 +133,33 @@ fun HomeScreen() {
     // 行内长按接管中(拖动排序/替换):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
     var rowHolding by remember { mutableStateOf(false) }
 
+    // 自定义壁纸:拉起系统 Photo Picker(免权限),选图后存私有目录 + 设为系统壁纸 + 切 custom 模式
+    val pickCustomWallpaper = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { CustomWallpaper.setFromUri(context, uri) }
+                if (ok) {
+                    store.setWallpaperMode(HomeStore.WALLPAPER_CUSTOM)
+                } else {
+                    Toast.makeText(context, "设置自定义壁纸失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val landscape = maxWidth > maxHeight
+        // 竖横屏按宽高比;折叠屏内屏展开(接近方形、宽<高)也强制横屏布局
+        val landscape = maxWidth > maxHeight || innerDisplayUnfolded
         val topSpace = maxHeight * 0.20f
         val listSpace = maxHeight * 0.05f
-        // 背景:内置几何壁纸(默认)或跟随系统壁纸(FLAG_SHOW_WALLPAPER + 暗纱)
+        // 背景:内置几何壁纸(默认)/ 跟随系统壁纸(FLAG_SHOW_WALLPAPER + 暗纱)/
+        // 自定义图片(自绘 bitmap,盖 20% 暗纱;文件丢失回退内置)
         val systemMode = data?.wallpaperMode == HomeStore.WALLPAPER_SYSTEM
+        val customMode = data?.wallpaperMode == HomeStore.WALLPAPER_CUSTOM
         ApplyShowWallpaperFlag(enabled = systemMode)
+        val customWallpaper = rememberCustomWallpaper(enabled = customMode)
         // 手势挂在背景层上:长按空白开设置(行内长按由行自己处理,行更深先收到事件)、上滑开抽屉
         val bgModifier = Modifier
             .fillMaxSize()
@@ -159,9 +188,25 @@ fun HomeScreen() {
             }
         if (systemMode) {
             SystemWallpaperScrim(bgModifier)
+        } else if (customMode && customWallpaper != null) {
+            Box(bgModifier) {
+                Image(
+                    bitmap = customWallpaper,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)))
+            }
         } else {
             Wallpaper(bgModifier)
         }
+
+        // 二级页面(选择器/抽屉/设置页)打开时隐藏主屏内容:
+        // 页面背景透明才能透出窗口下方(被模糊的)系统壁纸;
+        // 主屏 UI 与页面在同一个窗口里,不隐藏的话会透到页面上
+        val pageOpen = picker != null || drawerOpen || showSettings
+        val homeAlpha = if (pageOpen) 0f else 1f
 
         if (data != null) {
             val iconSize = data.iconSizeDp.dp
@@ -170,7 +215,7 @@ fun HomeScreen() {
 
             if (!landscape) {
                 // 竖屏:居中超大时钟 + 竖行列表 + 底部计数
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().alpha(homeAlpha)) {
                     Spacer(Modifier.height(topSpace))
                     ClockWidget(landscape = false, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(listSpace))
@@ -226,20 +271,28 @@ fun HomeScreen() {
                 }
             } else {
                 // 横屏:时钟左下,列表靠右单列(图标一列垂线、名称右对齐)
-                // 列宽固定 = 内容+边距;左滑只让选中行内容左移,列不伸缩
-                // + ACTION_WIDTH:左滑露出操作按钮时内容整体左移 176dp,
-                // 列表(滚动容器)会裁剪边界外内容,故裁切区向左扩出一个按钮区宽
+                // 边距/字号全部按屏幕尺寸自适应(折叠内屏等方形屏同样适用):
+                //   hMargin = 屏宽 5.5%,clamp [32, 120]dp —— 列表右缘与时钟左缘共用
+                //   vMargin = 屏高 6%(顶)/ 5%(底),clamp —— 列表上下留白
+                //   listWidth = 内容(icon+名称列+间距) + ACTION_WIDTH(左滑露出区) + 边距
+                //   时钟可用宽 = 屏宽 - hMargin - listWidth - 16dp 间距,字号受它约束,不与列表重叠
+                val hMargin = (maxWidth * 0.055f).coerceIn(32.dp, 120.dp)
+                val vMarginTop = (maxHeight * 0.06f).coerceIn(24.dp, 72.dp)
+                val vMarginBottom = (maxHeight * 0.05f).coerceIn(20.dp, 80.dp)
                 val listWidth = with(LocalDensity.current) {
                     (iconSize.toPx() + (fontSize * 5.5f).toPx() + 18.dp.toPx() +
-                        20.dp.toPx() + 180.dp.toPx() + 12.dp.toPx() + 12.dp.toPx() +
+                        20.dp.toPx() + hMargin.toPx() + 12.dp.toPx() + 12.dp.toPx() +
                         ACTION_WIDTH.toPx()).toDp()
                 }
-                Box(Modifier.fillMaxSize()) {
+                val clockAvailWidth =
+                    (maxWidth - hMargin - listWidth - 16.dp).coerceAtLeast(120.dp)
+                Box(Modifier.fillMaxSize().alpha(homeAlpha)) {
                     ClockWidget(
                         landscape = true,
+                        availableWidthDp = clockAvailWidth.value,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(start = 180.dp, bottom = 80.dp),
+                            .padding(start = hMargin, bottom = vMarginBottom),
                     )
                     AppList(
                         items = items,
@@ -278,7 +331,7 @@ fun HomeScreen() {
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
                             .width(listWidth)
-                            .padding(start = 20.dp, end = 180.dp, top = 48.dp, bottom = 48.dp)
+                            .padding(start = 20.dp, end = hMargin, top = vMarginTop, bottom = vMarginBottom)
                     )
                 }
             }
@@ -316,6 +369,11 @@ fun HomeScreen() {
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
                     onShowBadges = { scope.launch { store.setShowBadges(it) } },
                     onWallpaperMode = { scope.launch { store.setWallpaperMode(it) } },
+                    onPickCustomWallpaper = {
+                        pickCustomWallpaper.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
                     onReset = {
                         showSettings = false
                         scope.launch {
@@ -339,6 +397,7 @@ fun HomeScreen() {
             iconSize = data.iconSizeDp.dp,
             fontSize = data.fontSizeSp.sp,
             showIcons = data.showIcons,
+            wallpaperMode = data.wallpaperMode,
             adding = req is PickerRequest.Add,
             onPick = { entry ->
                 when (req) {
@@ -382,6 +441,7 @@ fun HomeScreen() {
                 iconSize = data.iconSizeDp.dp,
                 fontSize = data.fontSizeSp.sp,
                 showIcons = data.showIcons,
+                wallpaperMode = data.wallpaperMode,
                 onAddToHome = { entry ->
                     scope.launch {
                         val cur = data.entries

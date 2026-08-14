@@ -35,6 +35,7 @@ class HomeStore(private val context: Context) {
 
         const val WALLPAPER_BUILTIN = "builtin"
         const val WALLPAPER_SYSTEM = "system"
+        const val WALLPAPER_CUSTOM = "custom"
 
         private val KEY_ENTRIES = stringPreferencesKey("home_entries")
         private val KEY_INIT = booleanPreferencesKey("initialized")
@@ -88,7 +89,10 @@ class HomeStore(private val context: Context) {
 
     suspend fun setWallpaperMode(value: String) {
         context.homeDataStore.edit {
-            it[KEY_WALLPAPER] = if (value == WALLPAPER_SYSTEM) WALLPAPER_SYSTEM else WALLPAPER_BUILTIN
+            it[KEY_WALLPAPER] = when (value) {
+                WALLPAPER_SYSTEM, WALLPAPER_CUSTOM -> value
+                else -> WALLPAPER_BUILTIN
+            }
         }
     }
 

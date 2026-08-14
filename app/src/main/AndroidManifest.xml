@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+
     <!-- 通知角标:读取其他应用的通知数量需要通知使用权 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

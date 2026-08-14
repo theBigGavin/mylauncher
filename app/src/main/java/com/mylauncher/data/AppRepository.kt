@@ -4,8 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.text.Collator
 import java.util.Locale
 
@@ -29,8 +33,16 @@ class AppRepository(context: Context) {
     private val _apps = MutableStateFlow<List<AppEntry>?>(null)
     val apps: StateFlow<List<AppEntry>?> = _apps
 
+    private val bgScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** 同步全量查询(PackageManager IPC,勿在主线程调用)。 */
     fun refresh() {
         _apps.value = queryLaunchableApps()
+    }
+
+    /** 异步刷新:供广播接收器等主线程入口使用。 */
+    fun refreshAsync() {
+        bgScope.launch { refresh() }
     }
 
     @Suppress("DEPRECATION")
