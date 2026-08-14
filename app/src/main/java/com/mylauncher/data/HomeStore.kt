@@ -53,8 +53,8 @@ data class HomeData(
 class HomeStore(private val context: Context) {
 
     companion object {
-        const val MAX_APPS = 20
-        /** 桌面槽位数的可配置范围:最少 4 个,最多 20 个。 */
+        const val MAX_APPS = 100
+        /** 桌面槽位数的可配置范围:最少 4 个,最多 100 个;默认 20。 */
         const val MIN_MAX_APPS = 4
         const val DEFAULT_MAX_APPS = 20
         const val DEFAULT_ICON_DP = 38

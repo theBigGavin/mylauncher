@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
+    <!-- 抽屉"删除":ColorOS 等 ROM 的卸载确认页要求调用方持有该权限,否则 UninstallerActivity 直接 finish -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
     <!-- 通知角标:读取其他应用的通知数量需要通知使用权 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

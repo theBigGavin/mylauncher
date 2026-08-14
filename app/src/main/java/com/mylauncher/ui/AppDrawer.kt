@@ -52,8 +52,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -396,9 +398,15 @@ internal fun AppListOverlay(
                                 .pointerInput(app.component) {
                                     awaitEachGesture {
                                         val down = awaitFirstDown(requireUnconsumed = false)
-                                        // 行内子按钮(收藏星标/右侧操作)已消费的按下不再处理:
-                                        // 否则星标点按会同时误触发行点击(启动应用)
-                                        if (down.isConsumed) return@awaitEachGesture
+                                        // 行内子按钮(收藏星标/右侧操作)已消费的按下:静候抬手即结束本手势,
+                                        // 不处理也不消费 —— 否则会抢按钮的点击(导致按钮点不中/点击被取消)
+                                        if (down.isConsumed) {
+                                            while (true) {
+                                                val event = awaitPointerEvent(PointerEventPass.Main)
+                                                if (event.changes.any { it.changedToUpIgnoreConsumed() }) break
+                                            }
+                                            return@awaitEachGesture
+                                        }
                                         val press = PressInteraction.Press(down.position)
                                         scope.launch { interactionSource.emit(press) }
                                         when (val outcome = awaitPressOutcome(down)) {
@@ -444,31 +452,6 @@ internal fun AppListOverlay(
                                     .fillMaxSize()
                                     .background(Color.White.copy(alpha = rowBgAlpha))
                             )
-                            // 右侧操作按钮(带右缘边距,与内容对齐;滑入 + 淡入动效)
-                            Row(
-                                Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .height(rowHeight)
-                                    .padding(end = LIST_H_MARGIN)
-                                    .graphicsLayer {
-                                        alpha = buttonsAlpha
-                                        translationX = (1f - buttonsAlpha) * slidePx
-                                    },
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                currentActions.forEach { action ->
-                                    RevealButton(
-                                        label = action.label,
-                                        fg = if (action.destructive) Color(0xFFFF8A80) else Color.White,
-                                        enabled = revealed,
-                                        modifier = Modifier.width(actionWidth() / 3),
-                                        onClick = {
-                                            revealed = false
-                                            action.onClick(currentApp)
-                                        },
-                                    )
-                                }
-                            }
                             // 内容层(图标+名称,保持原位,全程可见;fillMaxSize 保证垂直居中与按钮对齐)
                             Box(
                                 Modifier
@@ -507,16 +490,42 @@ internal fun AppListOverlay(
                                     )
                                 }
                             }
-                            // 收藏星标:行首固定,点按切换收藏(收藏在列表中置顶);
-                            // 左滑展开操作按钮时随按钮淡出。触控区 34dp 不越出左边缘留白,不与内容重叠
+                            // 右侧操作按钮:必须画在内容层之上(后绘 = 命中优先),
+                            // 否则内容层 fillMaxSize 挡住按钮,点按永远落不到按钮上(修过的坑);
+                            // 深色衬底保证按钮文字压在长名称上仍然可读
+                            Row(
+                                Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .height(rowHeight)
+                                    .padding(end = LIST_H_MARGIN)
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .graphicsLayer {
+                                        alpha = buttonsAlpha
+                                        translationX = (1f - buttonsAlpha) * slidePx
+                                    },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                currentActions.forEach { action ->
+                                    RevealButton(
+                                        label = action.label,
+                                        fg = if (action.destructive) Color(0xFFFF8A80) else Color.White,
+                                        enabled = revealed,
+                                        modifier = Modifier.width(actionWidth() / 3),
+                                        onClick = {
+                                            revealed = false
+                                            action.onClick(currentApp)
+                                        },
+                                    )
+                                }
+                            }
+                            // 收藏星标:行首固定、全程可见(展开时也不淡出),点按切换收藏(收藏在列表中置顶)
                             if (currentToggleFavorite != null) {
                                 Box(
                                     Modifier
                                         .align(Alignment.CenterStart)
                                         .padding(start = 16.dp)
                                         .size(34.dp)
-                                        .graphicsLayer { alpha = 1f - buttonsAlpha }
-                                        .clickable(enabled = !revealed) {
+                                        .clickable {
                                             currentToggleFavorite?.invoke(currentApp)
                                         },
                                     contentAlignment = Alignment.Center,

@@ -313,10 +313,11 @@ internal fun RevealButton(
     modifier: Modifier = Modifier,
 ) {
     Box(
+        // 未启用时完全不挂 clickable:禁用态 clickable 仍会消费按下,挡住下面行的滑动手势(抽屉右侧区域滑不动)
         modifier
             .width(actionWidth() / 2)
             .height(48.dp)
-            .clickable(enabled = enabled, onClick = onClick),
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         BasicText(
@@ -471,37 +472,6 @@ fun AppList(
                         Modifier
                             .fillMaxSize()
                             .background(Color.White.copy(alpha = rowBgAlpha))
-                    )
-                }
-                // 操作按钮层:行右侧,内容左滑后露出(自右滑入 + 淡入)
-                Row(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .height(rowHeight)
-                        .graphicsLayer {
-                            alpha = buttonsAlpha
-                            translationX = (1f - buttonsAlpha) * with(density) { 20.dp.toPx() }
-                        },
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RevealButton(
-                        label = "改名",
-                        fg = Color.White,
-                        enabled = revealed,
-                        onClick = {
-                            setRevealed(-1)
-                            currentOnRename(index)
-                        },
-                    )
-                    RevealButton(
-                        label = "移除",
-                        fg = Color(0xFFFF8A80),
-                        enabled = revealed,
-                        onClick = {
-                            setRevealed(-1)
-                            currentOnRemove(index)
-                        },
                     )
                 }
                 // 内容层:整行承载手势与 Material 水波纹,但只有落在图标+名称范围才算有效触控
@@ -659,6 +629,38 @@ fun AppList(
                             modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
                         )
                     }
+                }
+                // 操作按钮层:必须画在内容层之上(后绘 = 命中优先)——内容层 fillMaxSize 即使透明也会挡按钮的点击(修过的坑);
+                // 未展开时按钮不挂 clickable,命中直接穿透给内容层,行手势不受影响
+                Row(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .height(rowHeight)
+                        .graphicsLayer {
+                            alpha = buttonsAlpha
+                            translationX = (1f - buttonsAlpha) * with(density) { 20.dp.toPx() }
+                        },
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RevealButton(
+                        label = "改名",
+                        fg = Color.White,
+                        enabled = revealed,
+                        onClick = {
+                            setRevealed(-1)
+                            currentOnRename(index)
+                        },
+                    )
+                    RevealButton(
+                        label = "移除",
+                        fg = Color(0xFFFF8A80),
+                        enabled = revealed,
+                        onClick = {
+                            setRevealed(-1)
+                            currentOnRemove(index)
+                        },
+                    )
                 }
             }
         }
