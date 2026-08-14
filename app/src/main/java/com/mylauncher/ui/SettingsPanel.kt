@@ -1,16 +1,19 @@
 package com.mylauncher.ui
 
-import android.app.WallpaperManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -32,7 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -46,6 +53,10 @@ import com.mylauncher.badges.isBadgeListenerEnabled
 import com.mylauncher.data.HomeStore
 import kotlin.math.roundToInt
 
+/** GitHub Octocat 徽标路径(simple-icons 的 24×24 视图)。 */
+private const val GITHUB_MARK_PATH =
+    "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+
 /**
  * 全屏设置页:长按主屏空白处打开。
  * Zune 风格:左对齐、大字号,白字直接铺在壁纸上,与桌面列表一致。
@@ -58,13 +69,17 @@ fun SettingsScreen(
     showIcons: Boolean,
     showBadges: Boolean,
     wallpaperMode: String,
+    customScale: Float,
+    customOffsetX: Float,
+    customOffsetY: Float,
+    listHeightPercent: Int,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
     onShowIcons: (Boolean) -> Unit,
     onShowBadges: (Boolean) -> Unit,
-    onWallpaperMode: (String) -> Unit,
-    onPickCustomWallpaper: () -> Unit,
+    onPickSystemWallpaper: () -> Unit,
+    onListHeight: (Int) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -165,6 +180,14 @@ fun SettingsScreen(
                         onChange = { onFontSize(it.roundToInt()) },
                     )
                 }
+                SettingRow("列表高度") {
+                    MiniSlider(
+                        value = listHeightPercent.toFloat(),
+                        range = 25f..50f,
+                        modifier = Modifier.width(150.dp),
+                        onChange = { onListHeight(it.roundToInt()) },
+                    )
+                }
                 SettingRow("列表行距") {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         spacingOptions.forEach { (rows, spacing) ->
@@ -195,23 +218,23 @@ fun SettingsScreen(
                 SettingRow("通知角标") {
                     MiniSwitch(checked = showBadges, onChange = onShowBadges)
                 }
-                SettingRow("跟随系统壁纸") {
-                    MiniSwitch(
-                        checked = wallpaperMode == HomeStore.WALLPAPER_SYSTEM,
-                        onChange = { onWallpaperMode(if (it) HomeStore.WALLPAPER_SYSTEM else HomeStore.WALLPAPER_BUILTIN) },
-                    )
-                }
-                if (wallpaperMode == HomeStore.WALLPAPER_SYSTEM) {
-                    TextButton(
-                        text = "更换壁纸…",
-                        onClick = { openWallpaperPicker(context) },
-                        strong = false,
+                SettingRow("壁纸") {
+                    BasicText(
+                        text = when (wallpaperMode) {
+                            HomeStore.WALLPAPER_CUSTOM -> "自定义(旧配置)"
+                            HomeStore.WALLPAPER_SYSTEM -> "跟随系统"
+                            else -> "内置几何"
+                        },
+                        style = TextStyle(
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                        ),
                     )
                 }
                 TextButton(
-                    text = if (wallpaperMode == HomeStore.WALLPAPER_CUSTOM) "自定义壁纸 ✓(点按换一张)" else "自定义壁纸…",
-                    onClick = onPickCustomWallpaper,
-                    strong = wallpaperMode == HomeStore.WALLPAPER_CUSTOM,
+                    text = "更换壁纸…",
+                    onClick = onPickSystemWallpaper,
+                    strong = false,
                 )
                 SettingRow("默认桌面") {
                     BasicText(
@@ -268,6 +291,54 @@ fun SettingsScreen(
                     onClick = onDismiss,
                     strong = false,
                 )
+                Spacer(Modifier.height(28.dp))
+                // 页脚:版本号 + GitHub logo(点击打开仓库)
+                val versionName = runCatching {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                }.getOrNull()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BasicText(
+                        text = "MyLauncher v${versionName ?: "?"}",
+                        style = TextStyle(
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontSize = 13.sp,
+                            letterSpacing = 1.sp,
+                        ),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    val githubPath = remember {
+                        PathParser().parsePathString(GITHUB_MARK_PATH).toPath()
+                    }
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse("https://github.com/theBigGavin/mylauncher"),
+                                        )
+                                    )
+                                }
+                            }
+                            .padding(6.dp)
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val scale = size.minDimension / 24f
+                            withTransform({
+                                translate(
+                                    left = (size.width - 24f * scale) / 2f,
+                                    top = (size.height - 24f * scale) / 2f,
+                                )
+                                scale(scale, scale, pivot = Offset.Zero)
+                            }) {
+                                drawPath(githubPath, Color.White.copy(alpha = 0.85f))
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -301,23 +372,6 @@ private fun TextButton(
  * 拉起系统壁纸选择器:优先 ACTION_SET_WALLPAPER;
  * ROM 不支持时降级 ACTION_CHANGE_LIVE_WALLPAPER;再不支持则 Toast 提示。
  */
-private fun openWallpaperPicker(context: Context) {
-    val candidates = listOf(
-        Intent(Intent.ACTION_SET_WALLPAPER),
-        Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER),
-    )
-    for (intent in candidates) {
-        try {
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            return
-        } catch (e: ActivityNotFoundException) {
-            // 尝试下一个
-        } catch (e: Exception) {
-            // 部分 ROM 会抛 SecurityException 等,同样降级
-        }
-    }
-    Toast.makeText(context, "无法打开系统壁纸选择器", Toast.LENGTH_SHORT).show()
-}
 
 /**
  * 当前默认桌面的 ComponentName。

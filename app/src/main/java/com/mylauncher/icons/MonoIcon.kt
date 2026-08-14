@@ -158,3 +158,16 @@ fun rememberMonoIcon(entry: AppEntry, size: Dp): ImageBitmap? {
         }
     }.value
 }
+
+/**
+ * 后台预热全部应用的单色图标(IO 线程):抽屉/选择器打开时直接命中缓存,
+ * 避免首次打开时现场走 PackageManager 拉图标,拖垮主线程导致点击延迟。
+ */
+suspend fun warmUpIcons(context: Context, apps: List<AppEntry>, sizePx: Int) =
+    withContext(Dispatchers.IO) {
+        apps.forEach { entry ->
+            if (MonoIcons.memoryOnly(entry, sizePx) == null) {
+                MonoIcons.loadCached(context, entry, sizePx)
+            }
+        }
+    }

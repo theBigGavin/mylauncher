@@ -79,6 +79,9 @@ fun AppDrawer(
     fontSize: TextUnit,
     showIcons: Boolean,
     wallpaperMode: String,
+    customScale: Float,
+    customOffsetX: Float,
+    customOffsetY: Float,
     onAddToHome: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -91,12 +94,29 @@ fun AppDrawer(
         fontSize = fontSize,
         showIcons = showIcons,
         wallpaperMode = wallpaperMode,
+        customScale = customScale,
+        customOffsetX = customOffsetX,
+        customOffsetY = customOffsetY,
         rowActions = { entry ->
             listOf(
-                RowAction(label = "放入桌面", onClick = { onAddToHome(it) }),
+                RowAction(label = "放入", onClick = { onAddToHome(it) }),
                 RowAction(label = "删除", destructive = true, onClick = { deleteApp(context, it) }),
                 RowAction(label = "信息", onClick = { appInfo(context, it) }),
             )
+        },
+        // 点击行 = 启动该应用(与副标题"点击启动"一致)
+        onRowClick = { entry ->
+            runCatching {
+                context.startActivity(
+                    Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_LAUNCHER)
+                        setClassName(entry.packageName, entry.activityName)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            }
+            // 启动后收起抽屉:从应用返回时直接回主屏,不再停留在抽屉
+            onDismiss()
         },
         onDismiss = onDismiss,
     )
@@ -131,13 +151,16 @@ internal fun AppListOverlay(
     fontSize: TextUnit,
     showIcons: Boolean,
     wallpaperMode: String,
+    customScale: Float = 1f,
+    customOffsetX: Float = 0f,
+    customOffsetY: Float = 0f,
     onDismiss: () -> Unit,
     onRowClick: ((AppEntry) -> Unit)? = null,
     rowActions: ((AppEntry) -> List<RowAction>)? = null,
 ) {
     BackHandler(onBack = onDismiss)
-    // 默认显示系统应用(无图标/无界面的已在仓库层过滤);用户可手动隐藏
-    var showSystem by remember { mutableStateOf(true) }
+    // 默认不显示系统应用(无图标/无界面的已在仓库层过滤);用户可手动打开
+    var showSystem by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     val visible = remember(apps, showSystem, query) {
         val base = if (showSystem) apps else apps.filter { !it.isSystem }
@@ -154,10 +177,17 @@ internal fun AppListOverlay(
     val currentOnRowClick by rememberUpdatedState(onRowClick)
     val currentRowActions by rememberUpdatedState(rowActions)
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val actionWidthPx = with(density) { 264.dp.toPx() } // 三个按钮
+    // 三个按钮的总宽:窄屏(手机竖屏)缩短,避免盖住左侧内容;与桌面左滑按钮同一套自适应
+    val actionWidthPx = with(density) { actionWidth().toPx() }
 
     Box(Modifier.fillMaxSize()) {
-        GlassPageBackground(wallpaperMode, Modifier.fillMaxSize())
+        GlassPageBackground(
+            wallpaperMode,
+            Modifier.fillMaxSize(),
+            customScale = customScale,
+            customOffsetX = customOffsetX,
+            customOffsetY = customOffsetY,
+        )
         // 空白处点按关闭(不吞列表滚动事件);空白处下滑同样收起
         Box(
             Modifier
@@ -280,7 +310,10 @@ internal fun AppListOverlay(
                                 landscape = false,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = LIST_H_MARGIN),
+                                    .padding(
+                                        horizontal = if (config.screenWidthDp > config.screenHeightDp)
+                                            LIST_H_MARGIN else PORTRAIT_ROW_MARGIN
+                                    ),
                             )
                         }
                     } else {
@@ -341,8 +374,11 @@ internal fun AppListOverlay(
                                                 revealed = false
                                             }
                                             PressOutcome.LongPress -> {
+                                                // 部分设备/注入下 UP 延迟超过长按时限,点击会被判成长按 ——
+                                                // 未展开时同样启动应用,保证点击可用
                                                 scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
                                                 if (currentRevealed) revealed = false
+                                                else currentOnRowClick?.invoke(app)
                                             }
                                             PressOutcome.Cancelled -> {
                                                 scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }
@@ -374,7 +410,7 @@ internal fun AppListOverlay(
                                         label = action.label,
                                         fg = if (action.destructive) Color(0xFFFF8A80) else Color.White,
                                         enabled = revealed,
-                                        modifier = Modifier.width(88.dp),
+                                        modifier = Modifier.width(actionWidth() / 3),
                                         onClick = {
                                             revealed = false
                                             action.onClick(currentApp)
@@ -386,7 +422,10 @@ internal fun AppListOverlay(
                             Box(
                                 Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = LIST_H_MARGIN),
+                                    .padding(
+                                        horizontal = if (config.screenWidthDp > config.screenHeightDp)
+                                            LIST_H_MARGIN else PORTRAIT_ROW_MARGIN
+                                    ),
                                 contentAlignment = Alignment.CenterStart,
                             ) {
                                 Row(

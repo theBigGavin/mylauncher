@@ -4,10 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -42,8 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -53,8 +51,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.mylauncher.badges.BadgeStore
 import com.mylauncher.data.AppEntry
+import com.mylauncher.icons.warmUpIcons
 import com.mylauncher.data.AppRepository
-import com.mylauncher.data.CustomWallpaper
 import com.mylauncher.data.DefaultApps
 import com.mylauncher.data.HomeStore
 import com.mylauncher.data.StoredEntry
@@ -109,6 +107,36 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         }
     }
 
+    // 当前形态(竖屏/横屏/内屏展开)对应的壁纸裁切变换
+    val curForm = if (innerDisplayUnfolded) HomeStore.WALLPAPER_FORM_INNER
+    else if (LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp)
+        HomeStore.WALLPAPER_FORM_LANDSCAPE
+    else HomeStore.WALLPAPER_FORM_PORTRAIT
+    val wpScale = when (curForm) {
+        HomeStore.WALLPAPER_FORM_INNER -> data?.customWallpaperScaleInner ?: 1f
+        HomeStore.WALLPAPER_FORM_LANDSCAPE -> data?.customWallpaperScaleLandscape ?: 1f
+        else -> data?.customWallpaperScale ?: 1f
+    }
+    val wpOffsetX = when (curForm) {
+        HomeStore.WALLPAPER_FORM_INNER -> data?.customWallpaperOffsetXInner ?: 0f
+        HomeStore.WALLPAPER_FORM_LANDSCAPE -> data?.customWallpaperOffsetXLandscape ?: 0f
+        else -> data?.customWallpaperOffsetX ?: 0f
+    }
+    val wpOffsetY = when (curForm) {
+        HomeStore.WALLPAPER_FORM_INNER -> data?.customWallpaperOffsetYInner ?: 0f
+        HomeStore.WALLPAPER_FORM_LANDSCAPE -> data?.customWallpaperOffsetYLandscape ?: 0f
+        else -> data?.customWallpaperOffsetY ?: 0f
+    }
+
+    // 后台预热全部应用图标(IO 线程):抽屉/选择器打开时直接命中缓存,
+    // 避免首次打开时现场走 PackageManager 拉图标,拖慢主线程导致点击延迟
+    val warmSizePx = with(LocalDensity.current) { ((data?.iconSizeDp ?: 40).dp).roundToPx() }.coerceAtLeast(24)
+    LaunchedEffect(apps, warmSizePx) {
+        if (apps != null) {
+            warmUpIcons(context, apps, warmSizePx)
+        }
+    }
+
     // 解析持久化条目为真实 App;已卸载的条目静默剔除
     val items = remember(apps, data) {
         if (apps == null || data == null) {
@@ -130,43 +158,35 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var drawerOpen by remember { mutableStateOf(false) }
     var renameIndex by remember { mutableIntStateOf(-1) }
     var showSettings by remember { mutableStateOf(false) }
-    // 行内长按接管中(拖动排序/替换):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
-    var rowHolding by remember { mutableStateOf(false) }
 
-    // 自定义壁纸:拉起系统 Photo Picker(免权限),选图后存私有目录 + 设为系统壁纸 + 切 custom 模式
-    val pickCustomWallpaper = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val ok = withContext(Dispatchers.IO) { CustomWallpaper.setFromUri(context, uri) }
-                if (ok) {
-                    store.setWallpaperMode(HomeStore.WALLPAPER_CUSTOM)
-                } else {
-                    Toast.makeText(context, "设置自定义壁纸失败", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
+    // 更换壁纸:交给系统壁纸管理器(选择 + 裁切 + 横竖屏/内屏适配全由系统处理),
+    // 桌面用 FLAG_SHOW_WALLPAPER 跟随系统壁纸
+    fun openSystemWallpaper() {
+        scope.launch { store.setWallpaperMode(HomeStore.WALLPAPER_SYSTEM) }
+        runCatching { context.startActivity(Intent(Intent.ACTION_SET_WALLPAPER)) }
     }
+
+    // 背景:内置几何壁纸(默认)/ 跟随系统壁纸(FLAG_SHOW_WALLPAPER + 暗纱)/
+    // 自定义图片(自绘 bitmap,盖 20% 暗纱;文件丢失回退内置)
+    val systemMode = data?.wallpaperMode == HomeStore.WALLPAPER_SYSTEM
+    val customMode = data?.wallpaperMode == HomeStore.WALLPAPER_CUSTOM
+    ApplyShowWallpaperFlag(enabled = systemMode)
+    val customWallpaper = rememberCustomWallpaper(enabled = customMode)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // 竖横屏按宽高比;折叠屏内屏展开(接近方形、宽<高)也强制横屏布局
         val landscape = maxWidth > maxHeight || innerDisplayUnfolded
         val topSpace = maxHeight * 0.20f
         val listSpace = maxHeight * 0.05f
-        // 背景:内置几何壁纸(默认)/ 跟随系统壁纸(FLAG_SHOW_WALLPAPER + 暗纱)/
-        // 自定义图片(自绘 bitmap,盖 20% 暗纱;文件丢失回退内置)
-        val systemMode = data?.wallpaperMode == HomeStore.WALLPAPER_SYSTEM
-        val customMode = data?.wallpaperMode == HomeStore.WALLPAPER_CUSTOM
-        ApplyShowWallpaperFlag(enabled = systemMode)
-        val customWallpaper = rememberCustomWallpaper(enabled = customMode)
+        val bottomSpace = maxHeight * 0.10f // 底部空白触发区(上滑开抽屉)
+        val listHeight = maxHeight * (data?.listHeightPercent ?: 50) / 100f // 竖屏列表视口高度
         // 手势挂在背景层上:长按空白开设置(行内长按由行自己处理,行更深先收到事件)、上滑开抽屉
         val bgModifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = {
-                        if (!rowHolding && picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
+                        if (picker == null && !drawerOpen && renameIndex < 0 && !showSettings) {
                             showSettings = true
                         }
                     },
@@ -174,9 +194,16 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             }
             .pointerInput(Unit) {
                 var upward = false
+                var startY = 0f
+                // 只在屏幕下方约 2/3 区域上滑才开抽屉:顶部是时钟/状态区,
+                // 上拉容易误触抽屉,破坏体验
+                val triggerTop = size.height * 0.35f
                 detectVerticalDragGestures(
+                    onDragStart = { startY = it.y },
                     onDragEnd = {
-                        if (upward && !rowHolding && picker == null && renameIndex < 0 && !showSettings && !drawerOpen) {
+                        if (upward && startY > triggerTop &&
+                            picker == null && renameIndex < 0 && !showSettings && !drawerOpen
+                        ) {
                             drawerOpen = true
                         }
                         upward = false
@@ -193,8 +220,21 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 Image(
                     bitmap = customWallpaper,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
+                    // 铺满基准缩放 × 用户裁切缩放 + 平移(与裁切屏同一套变换)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val cover = maxOf(
+                                size.width / customWallpaper.width,
+                                size.height / customWallpaper.height,
+                            )
+                            val total = cover * wpScale.coerceIn(1f, 5f)
+                            scaleX = total
+                            scaleY = total
+                            translationX = wpOffsetX * size.width
+                            translationY = wpOffsetY * size.height
+                        },
+                    contentScale = ContentScale.Fit,
                 )
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)))
             }
@@ -251,23 +291,14 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                                 }
                             }
                         },
-                        onHoldChange = { rowHolding = it },
                         modifier = Modifier
-                            .weight(1f)
+                            .height(listHeight)
                             .fillMaxWidth(),
                     )
-                    BasicText(
-                        text = "— ${items.size} / ${HomeStore.MAX_APPS} —",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp, bottom = 48.dp),
-                        style = TextStyle(
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 12.sp,
-                            letterSpacing = 2.sp,
-                            textAlign = TextAlign.Center,
-                        ),
-                    )
+                    // 底部空白区:列表下方保留 10% 屏高,此处上滑可拉出抽屉
+                    // (列表自身的纵向拖动被滚动/行手势消费,必须留出列表之外的触发区;
+                    // 计数条已移除 —— 它遮挡底部上滑手势)
+                    Spacer(Modifier.height(bottomSpace))
                 }
             } else {
                 // 横屏:时钟左下,列表靠右单列(图标一列垂线、名称右对齐)
@@ -282,7 +313,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 val listWidth = with(LocalDensity.current) {
                     (iconSize.toPx() + (fontSize * 5.5f).toPx() + 18.dp.toPx() +
                         20.dp.toPx() + hMargin.toPx() + 12.dp.toPx() + 12.dp.toPx() +
-                        ACTION_WIDTH.toPx()).toDp()
+                        actionWidth().toPx()).toDp()
                 }
                 val clockAvailWidth =
                     (maxWidth - hMargin - listWidth - 16.dp).coerceAtLeast(120.dp)
@@ -326,7 +357,6 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                                 }
                             }
                         },
-                        onHoldChange = { rowHolding = it },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
@@ -363,17 +393,19 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     showIcons = data.showIcons,
                     showBadges = data.showBadges,
                     wallpaperMode = data.wallpaperMode,
+                    customScale = wpScale,
+                    customOffsetX = wpOffsetX,
+                    customOffsetY = wpOffsetY,
+                    listHeightPercent = data.listHeightPercent,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
                     onShowBadges = { scope.launch { store.setShowBadges(it) } },
-                    onWallpaperMode = { scope.launch { store.setWallpaperMode(it) } },
-                    onPickCustomWallpaper = {
-                        pickCustomWallpaper.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                    onPickSystemWallpaper = {
+                        openSystemWallpaper()
                     },
+                    onListHeight = { scope.launch { store.setListHeightPercent(it) } },
                     onReset = {
                         showSettings = false
                         scope.launch {
@@ -386,6 +418,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onDismiss = { showSettings = false },
                 )
             }
+
         }
     }
 
@@ -442,6 +475,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 fontSize = data.fontSizeSp.sp,
                 showIcons = data.showIcons,
                 wallpaperMode = data.wallpaperMode,
+                customScale = wpScale,
+                customOffsetX = wpOffsetX,
+                customOffsetY = wpOffsetY,
                 onAddToHome = { entry ->
                     scope.launch {
                         val cur = data.entries
@@ -456,6 +492,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             )
         }
     }
+
 }
 
 private fun launch(context: Context, repo: AppRepository, entry: AppEntry) {

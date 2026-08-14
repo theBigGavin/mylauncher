@@ -17,7 +17,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -124,7 +124,13 @@ fun ApplyBlurBehind(enabled: Boolean, radiusPx: Int = 25) {
  * 不依赖 ROM 的窗口模糊支持。
  */
 @Composable
-fun GlassPageBackground(wallpaperMode: String, modifier: Modifier = Modifier) {
+fun GlassPageBackground(
+    wallpaperMode: String,
+    modifier: Modifier = Modifier,
+    customScale: Float = 1f,
+    customOffsetX: Float = 0f,
+    customOffsetY: Float = 0f,
+) {
     when (wallpaperMode) {
         HomeStore.WALLPAPER_CUSTOM -> {
             val bitmap = rememberCustomWallpaper(enabled = true)
@@ -133,11 +139,22 @@ fun GlassPageBackground(wallpaperMode: String, modifier: Modifier = Modifier) {
                     Image(
                         bitmap = bitmap,
                         contentDescription = null,
+                        // 与主屏同一套裁切变换:铺满基准缩放 × 用户缩放 + 平移
                         modifier = Modifier
                             .fillMaxSize()
-                            .scale(1.08f)
+                            .graphicsLayer {
+                                val cover = maxOf(
+                                    size.width / bitmap.width,
+                                    size.height / bitmap.height,
+                                )
+                                val total = cover * customScale.coerceIn(1f, 5f)
+                                scaleX = total
+                                scaleY = total
+                                translationX = customOffsetX * size.width
+                                translationY = customOffsetY * size.height
+                            }
                             .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(28.dp) else Modifier),
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                     )
                 }
                 Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))

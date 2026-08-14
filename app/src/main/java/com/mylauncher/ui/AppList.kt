@@ -1,7 +1,6 @@
 package com.mylauncher.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -11,9 +10,10 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.indication
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,7 +58,6 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInParent
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -67,6 +65,7 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -80,16 +79,26 @@ import androidx.compose.ui.zIndex
 import com.mylauncher.data.AppEntry
 import com.mylauncher.data.HomeStore
 import com.mylauncher.icons.rememberMonoIcon
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /** 所有列表界面的左右边距:桌面 / 抽屉 / 选择器 / 设置页保持一致。 */
 val LIST_H_MARGIN = 80.dp
 
-/** 左滑露出的操作按钮总宽(修改名称 + 移除)。 */
+/** 竖屏主屏行的左右边距:比通用边距窄 1/3(触控区更宽,触发位置不局促);抽屉/选择器共用。 */
+internal val PORTRAIT_ROW_MARGIN = LIST_H_MARGIN * 2 / 3
+
+/** 左滑露出的操作按钮总宽(修改名称 + 移除)基线值。 */
 internal val ACTION_WIDTH = 176.dp
+
+/**
+ * 左滑操作按钮的实际总宽:窄屏(手机竖屏)缩短,避免内容被挤出屏幕。
+ * 宽屏(平板/横屏)保持 176dp。
+ */
+@Composable
+internal fun actionWidth(): Dp =
+    if (LocalConfiguration.current.screenWidthDp < 600) 112.dp else ACTION_WIDTH
 
 /** 主屏条目(已解析):真实 App + 可选自定义名。 */
 data class HomeItem(val app: AppEntry, val customName: String?) {
@@ -304,7 +313,7 @@ internal fun RevealButton(
 ) {
     Box(
         modifier
-            .width(ACTION_WIDTH / 2)
+            .width(actionWidth() / 2)
             .height(48.dp)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -341,18 +350,13 @@ fun AppList(
     onReplace: (index: Int) -> Unit,
     onRename: (index: Int) -> Unit,
     onRemove: (index: Int) -> Unit,
-    onReorder: (from: Int, to: Int) -> Unit,
-    onHoldChange: (Boolean) -> Unit = {},
+    onReorder: (from: Int, to: Int) -> Unit = { _, _ -> },
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
     val rowHeight = appRowHeight(iconSize, fontSize, rowSpacing)
-    val actionWidthPx = with(density) { ACTION_WIDTH.toPx() }
-    val rowHeightPx = with(density) { rowHeight.toPx() }
-    // 拖动排序:被拖行索引 + 实时目标行(其间各行让位一行)
-    var dragIndex by remember { mutableIntStateOf(-1) }
-    var dragTarget by remember { mutableIntStateOf(-1) }
+    val actionWidthPx = with(density) { actionWidth().toPx() }
 
     // 单行展开状态:只有该行左滑,其余行与列都保持原位
     var revealedIndex by remember { mutableIntStateOf(-1) }
@@ -365,40 +369,59 @@ fun AppList(
     val currentOnRename by rememberUpdatedState(onRename)
     val currentOnRemove by rememberUpdatedState(onRemove)
     val currentOnReorder by rememberUpdatedState(onReorder)
-    val currentOnHoldChange by rememberUpdatedState(onHoldChange)
 
-    // 普通 Column + verticalScroll(不用 LazyColumn):左滑时行内容滑出列边界,
-    // LazyColumn 会裁剪边界外的内容("APP被列表框遮挡消失"的根因);scrollable 不裁剪,可滚动。
-    val scrollState = rememberScrollState()
-    // 列表视口(window 坐标),拖拽排序边缘自动滚动用
-    var listBounds by remember { mutableStateOf(Rect.Zero) }
-    Column(
+    // LazyColumn:虚拟化 + 原生滚动;列宽已含 ACTION_WIDTH(左滑露出区),
+    // 滑出的内容仍在视口内,不会被裁剪
+    val scrollState = rememberLazyListState()
+    // "添加应用"按钮:默认隐藏;列表为空时恒显;拖动列表(即使不产生滚动)时临时出现,
+    // 超时自动隐藏 —— 点击已注册的拖动次数,每次拖动重置计时
+    var addShowTick by remember { mutableIntStateOf(0) }
+    val showAddRow = items.isEmpty() || addShowTick > 0
+    LaunchedEffect(addShowTick, items.isEmpty()) {
+        if (addShowTick > 0 && items.isNotEmpty()) {
+            delay(3000)
+            addShowTick = 0
+        }
+    }
+    LazyColumn(
         modifier = modifier
-            .onGloballyPositioned { listBounds = it.boundsInWindow() }
-            .verticalScroll(scrollState),
+            // 只观察不消费:任何纵向拖动(含不滚动的拖)都临时显示"添加应用"
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var dragged = false
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        var up = false
+                        for (change in event.changes) {
+                            if (change.id != down.id) continue
+                            if (change.changedToUp()) { up = true; break }
+                            if (!dragged &&
+                                abs(change.position.y - down.position.y) > viewConfiguration.touchSlop * 2f
+                            ) {
+                                dragged = true
+                                addShowTick++
+                            }
+                        }
+                        if (up) break
+                    }
+                }
+            },
+        state = scrollState,
+        // 竖屏列表完全放得下时才禁用原生滚动(纵向拖动穿透到壁纸开抽屉);
+        // 只要列表能朝任一方向滚动就保持原生滚动(否则滑到底后无法往回滑)
+        userScrollEnabled = landscape || scrollState.canScrollForward || scrollState.canScrollBackward,
     ) {
-        items.forEachIndexed { index, item ->
+        itemsIndexed(items, key = { _, it -> it.app.component }) { index, item ->
             val revealed = index == revealedIndex
             val currentRevealed by rememberUpdatedState(revealed)
             // 内容左移量(px):左滑拖拽跟手,松手按阈值落定;只有本行动,其余行原位
             val shift = remember { Animatable(0f) }
             val buttonsAlpha = (shift.value / actionWidthPx).coerceIn(0f, 1f)
-            // 拖动排序时被拖行的上浮量(px)
-            val lift = remember { Animatable(0f) }
-            // 拖动排序:被拖行之外、位于 [dragIndex, dragTarget] 之间的行让位一行
-            val shiftTarget = if (dragIndex >= 0 && index != dragIndex && dragTarget >= 0) {
-                when {
-                    dragTarget > dragIndex && index in (dragIndex + 1)..dragTarget -> rowHeight
-                    dragTarget < dragIndex && index in dragTarget until dragIndex -> -rowHeight
-                    else -> 0.dp
-                }
-            } else 0.dp
-            val shiftAnim by animateDpAsState(shiftTarget, label = "reorderShift")
-            // 选中行背景:让用户看出当前行处于"管理"/"拖动"状态
+            // 选中行背景:让用户看出当前行处于"管理"状态
             val rowBgAlpha by animateFloatAsState(
                 targetValue = if (revealed) 0.12f
                 else if (buttonsAlpha > 0f) 0.08f
-                else if (lift.value != 0f) 0.10f
                 else 0f,
                 label = "revealBg",
             )
@@ -413,15 +436,9 @@ fun AppList(
 
             Box(
                 Modifier
+                    .animateItem()
                     .fillMaxWidth()
                     .height(rowHeight)
-                    .zIndex(if (lift.value != 0f) 1f else 0f)
-                    .offset(y = shiftAnim)
-                    .graphicsLayer {
-                        translationY = lift.value
-                        scaleX = if (lift.value != 0f) 1.02f else 1f
-                        scaleY = if (lift.value != 0f) 1.02f else 1f
-                    }
             ) {
                 // 选中行背景:覆盖 滑出后的内容 + 操作按钮(横屏靠右;竖屏整行)
                 // requiredWidth:背景条要探出行/列表边界盖住滑出的内容,width 会被父约束钳制
@@ -429,7 +446,7 @@ fun AppList(
                     Box(
                         Modifier
                             .align(Alignment.CenterEnd)
-                            .requiredWidth(with(density) { (contentBounds.width + ACTION_WIDTH.toPx() + 12.dp.toPx()).toDp() })
+                            .requiredWidth(with(density) { (contentBounds.width + actionWidth().toPx() + 12.dp.toPx()).toDp() })
                             .fillMaxHeight()
                             .background(Color.White.copy(alpha = rowBgAlpha))
                     )
@@ -453,7 +470,7 @@ fun AppList(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RevealButton(
-                        label = "修改名称",
+                        label = "改名",
                         fg = Color.White,
                         enabled = revealed,
                         onClick = {
@@ -476,8 +493,13 @@ fun AppList(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .padding(horizontal = if (landscape) 12.dp else LIST_H_MARGIN)
-                        .graphicsLayer { translationX = -buttonsAlpha * actionWidthPx }
+                        .padding(horizontal = if (landscape) 12.dp else PORTRAIT_ROW_MARGIN)
+                        .graphicsLayer {
+                            // 左滑钳制:内容最多滑到离屏幕左缘 12dp,不跑出屏幕
+                            // (竖屏内容靠左,全量滑出会越界;横屏内容靠右,钳制不生效)
+                            val maxSlide = (contentBounds.left - 12.dp.toPx()).coerceAtLeast(0f)
+                            translationX = -minOf(buttonsAlpha * actionWidthPx, maxSlide)
+                        }
                         .indication(interactionSource, LocalIndication.current)
                         .pointerInput(item.app.component, index) {
                             awaitEachGesture {
@@ -498,81 +520,12 @@ fun AppList(
                                         else currentOnLaunch(item)
                                     }
                                     PressOutcome.LongPress -> {
+                                        scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
                                         if (currentRevealed) {
-                                            scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
                                             setRevealed(-1)
                                         } else {
-                                            // 长按后:按住并上下拖动 → 拖动排序;不动直接松手 → 替换应用
-                                            // hold 标志立即通知上层:长按已被行接管,壁纸的"长按开设置"不再触发
-                                            currentOnHoldChange(true)
-                                            try {
-                                                var reorder = false
-                                                var pointerYInList = Float.NaN
-                                                var autoScrollJob: Job? = null
-                                                val slop = viewConfiguration.touchSlop
-                                                val edgePx = 56.dp.toPx()
-                                                val maxStepPx = 12.dp.toPx()
-                                                while (true) {
-                                                    val event = awaitPointerEvent(PointerEventPass.Main)
-                                                    var up = false
-                                                    for (change in event.changes) {
-                                                        if (change.id != down.id) continue
-                                                        if (change.changedToUp()) { up = true; break }
-                                                        // 长按后的移动全部归行处理,不落到壁纸手势(避免误开抽屉/设置)
-                                                        change.consume()
-                                                        if (!reorder && abs(change.position.y - down.position.y) > slop * 2f) {
-                                                            reorder = true
-                                                            scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }
-                                                            dragIndex = index
-                                                            dragTarget = index
-                                                            autoScrollJob = scope.launch {
-                                                                while (true) {
-                                                                    val y = pointerYInList
-                                                                    val h = listBounds.height.toFloat()
-                                                                    if (!y.isNaN() && h > 0f) {
-                                                                        val delta = when {
-                                                                            y < edgePx -> -maxStepPx * (1f - y / edgePx)
-                                                                            y > h - edgePx -> maxStepPx * (1f - (h - y) / edgePx)
-                                                                            else -> 0f
-                                                                        }
-                                                                        if (delta != 0f) {
-                                                                            scrollState.dispatchRawDelta(delta)
-                                                                        }
-                                                                    }
-                                                                    withFrameNanos { }
-                                                                }
-                                                            }
-                                                        }
-                                                        if (reorder) {
-                                                            // 注意:position 坐标系会被本行的 graphicsLayer(lift)
-                                                            // 与列表滚动一起平移 —— 必须加回 lift 才是真实跟手位移,
-                                                            // 否则 dy 变成差分(行只跟手一半,drop 目标位计算错误)
-                                                            val dy = change.position.y - down.position.y + lift.value
-                                                            // 手指相对列表视口顶部的 y(行视口偏移 + 行内真实偏移),
-                                                            // 供边缘自动滚动判定
-                                                            pointerYInList = (index * rowHeightPx - scrollState.value) +
-                                                                (change.position.y + lift.value)
-                                                            scope.launch { lift.snapTo(dy) }
-                                                            dragTarget = (index + (dy / rowHeightPx).roundToInt())
-                                                                .coerceIn(0, currentItems.size - 1)
-                                                        }
-                                                    }
-                                                    if (up) break
-                                                }
-                                                autoScrollJob?.cancel()
-                                                if (reorder) {
-                                                    val finalTarget = dragTarget
-                                                    scope.launch { lift.animateTo(0f) }
-                                                    dragIndex = -1
-                                                    dragTarget = -1
-                                                    if (finalTarget != index) currentOnReorder(index, finalTarget)
-                                                } else {
-                                                    scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
-                                                    currentOnReplace(index)
-                                                }
-                                            } finally {
-                                                currentOnHoldChange(false)
-                                            }
+                                            // 长按超时立即打开替换选择页,不等手指抬起
+                                            currentOnReplace(index)
                                         }
                                     }
                                     PressOutcome.SwipeLeft -> {
@@ -638,20 +591,22 @@ fun AppList(
             }
         }
 
-        if (items.size < HomeStore.MAX_APPS) {
-            AddRow(
-                iconSize = iconSize,
-                fontSize = fontSize,
-                showIcons = showIcons,
-                landscape = landscape,
-                onClick = onAdd,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(rowHeight)
-                    // 横屏与普通行一致用 12dp;竖屏用统一边距 LIST_H_MARGIN
-                    // (横屏曾误用 80dp 导致"添加应用"名称被裁掉)
-                    .padding(horizontal = if (landscape) 12.dp else LIST_H_MARGIN),
-            )
+        if (showAddRow && items.size < HomeStore.MAX_APPS) {
+            item(key = "__add__") {
+                AddRow(
+                    iconSize = iconSize,
+                    fontSize = fontSize,
+                    showIcons = showIcons,
+                    landscape = landscape,
+                    onClick = onAdd,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(rowHeight)
+                        // 横屏与普通行一致用 12dp;竖屏用主屏行边距 PORTRAIT_ROW_MARGIN
+                        // (横屏曾误用 80dp 导致"添加应用"名称被裁掉)
+                        .padding(horizontal = if (landscape) 12.dp else PORTRAIT_ROW_MARGIN),
+                )
+            }
         }
     }
 }
