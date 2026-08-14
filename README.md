@@ -29,3 +29,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 - `app/src/main/java/com/mylauncher/` — 源码(data / icons / ui)
 - `design/` — 设计稿与效果图生成脚本(`mockup.html` 为可交互原型)
+
+## 版本规则
+
+语义化版本 `主版本.次版本.修订号`(如 1.1.0):
+
+- **主版本**:重大重构 / 不兼容变更 / 里程碑
+- **次版本**:新功能
+- **修订号**:Bug 修复 / 小调整
+
+`versionCode` 每次发版 +1(单调递增,系统据此判断升级)。
