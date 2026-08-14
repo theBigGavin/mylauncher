@@ -166,8 +166,7 @@ fun GlassPageBackground(
         }
         else -> {
             val systemWallpaper = wallpaperMode == HomeStore.WALLPAPER_SYSTEM
-            // 浮层出现时立即重挂窗口 flag + 模糊:避免首帧闪成内置壁纸再切系统壁纸
-            ApplyShowWallpaperFlag(enabled = systemWallpaper)
+            // 浮层出现时重挂窗口模糊(flag 由主屏统一管理,浮层关闭时不能移除它)
             ApplyBlurBehind(enabled = systemWallpaper && Build.VERSION.SDK_INT >= 31)
             if (!systemWallpaper) {
                 Wallpaper(modifier.fillMaxSize(), showMiddleLine = false)
