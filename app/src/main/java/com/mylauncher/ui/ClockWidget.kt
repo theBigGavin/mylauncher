@@ -1,7 +1,7 @@
 package com.mylauncher.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -147,16 +147,18 @@ private fun MeritBubble(
     val startSize = endSize * (0.30f + Random.nextFloat() * 0.30f)
     // 起始水平位置:时钟中间 1/3 范围内随机(垂直在时钟文字顶部)
     val startXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
-    // 扩散方向:向上偏左/偏右的斜线(±40° 随机,选定后不变,不左右乱晃)
-    val angleDeg = (Random.nextFloat() * 2f - 1f) * 40f
+    // 扩散方向:向上偏左/偏右的斜线(±25° 随机,选定后不变,不左右乱晃)
+    val angleDeg = (Random.nextFloat() * 2f - 1f) * 25f
     val rad = Math.toRadians(angleDeg.toDouble())
     val dirX = sin(rad).toFloat()
     val dirY = -cos(rad).toFloat()
     // 扩散距离:时钟顶部到屏幕顶端的距离(随机比例)
     val dist = clockTopWindowY * (0.8f + Random.nextFloat() * 0.4f)
     val progress = remember { Animatable(0f) }
+    // 贝塞尔曲线控制速度:快起慢收(冒泡感),运动平滑无抖动
+    val bubbleEasing = CubicBezierEasing(0.0f, 0.45f, 0.25f, 1.0f)
     LaunchedEffect(Unit) {
-        progress.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
+        progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
         onDone()
     }
     val scale = startSize / endSize + (1f - startSize / endSize) * progress.value
