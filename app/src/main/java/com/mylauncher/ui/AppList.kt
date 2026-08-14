@@ -545,7 +545,7 @@ fun AppList(
                                                 var finalTarget = index
                                                 val slop = viewConfiguration.touchSlop
                                                 // 宽限期内监听:移动超过阈值进入排序;松手/超时则进选择页
-                                                val movedOrUp = withTimeoutOrNull(300) {
+                                                val movedOrUp = withTimeoutOrNull(450) {
                                                     while (true) {
                                                         val event = awaitPointerEvent(PointerEventPass.Main)
                                                         var up = false
