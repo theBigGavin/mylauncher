@@ -18,6 +18,10 @@ data class StoredEntry(val component: String, val customName: String?)
 data class HomeData(
     val initialized: Boolean,
     val entries: List<StoredEntry>,
+    /** 桌面应用槽位数(用户可配置,4..20)。 */
+    val maxApps: Int,
+    /** 收藏的应用组件键集合(抽屉"所有应用"置顶显示)。 */
+    val favorites: Set<String>,
     val iconSizeDp: Int,
     val fontSizeSp: Int,
     val showIcons: Boolean,
@@ -50,6 +54,9 @@ class HomeStore(private val context: Context) {
 
     companion object {
         const val MAX_APPS = 20
+        /** 桌面槽位数的可配置范围:最少 4 个,最多 20 个。 */
+        const val MIN_MAX_APPS = 4
+        const val DEFAULT_MAX_APPS = 20
         const val DEFAULT_ICON_DP = 38
         const val DEFAULT_FONT_SP = 26
         const val DEFAULT_ROW_SPACING_DP = 0
@@ -63,6 +70,8 @@ class HomeStore(private val context: Context) {
         const val DEFAULT_LIST_HEIGHT_PERCENT = 50
 
         private val KEY_ENTRIES = stringPreferencesKey("home_entries")
+        private val KEY_MAX_APPS = intPreferencesKey("max_apps")
+        private val KEY_FAVORITES = stringPreferencesKey("favorites")
         private val KEY_INIT = booleanPreferencesKey("initialized")
         private val KEY_ICON = intPreferencesKey("icon_size_dp")
         private val KEY_FONT = intPreferencesKey("font_size_sp")
@@ -92,6 +101,8 @@ class HomeStore(private val context: Context) {
         HomeData(
             initialized = p[KEY_INIT] ?: false,
             entries = deserialize(p[KEY_ENTRIES].orEmpty()),
+            maxApps = p[KEY_MAX_APPS] ?: DEFAULT_MAX_APPS,
+            favorites = deserializeFavorites(p[KEY_FAVORITES].orEmpty()),
             iconSizeDp = p[KEY_ICON] ?: DEFAULT_ICON_DP,
             fontSizeSp = p[KEY_FONT] ?: DEFAULT_FONT_SP,
             showIcons = p[KEY_SHOW_ICONS] ?: true,
@@ -119,8 +130,22 @@ class HomeStore(private val context: Context) {
 
     suspend fun setEntries(entries: List<StoredEntry>) {
         context.homeDataStore.edit {
-            it[KEY_ENTRIES] = serialize(entries.take(MAX_APPS))
+            val max = it[KEY_MAX_APPS] ?: DEFAULT_MAX_APPS
+            it[KEY_ENTRIES] = serialize(entries.take(max))
             it[KEY_INIT] = true
+        }
+    }
+
+    suspend fun setMaxApps(value: Int) {
+        context.homeDataStore.edit { it[KEY_MAX_APPS] = value.coerceIn(MIN_MAX_APPS, MAX_APPS) }
+    }
+
+    /** 收藏/取消收藏:收藏的应用在抽屉"所有应用"中置顶。 */
+    suspend fun toggleFavorite(component: String, favorite: Boolean) {
+        context.homeDataStore.edit {
+            val cur = deserializeFavorites(it[KEY_FAVORITES].orEmpty()).toMutableSet()
+            if (favorite) cur.add(component) else cur.remove(component)
+            it[KEY_FAVORITES] = cur.sorted().joinToString("\n")
         }
     }
 
@@ -218,6 +243,7 @@ class HomeStore(private val context: Context) {
     suspend fun resetAll(defaultEntries: List<StoredEntry>) {
         context.homeDataStore.edit {
             it[KEY_ENTRIES] = serialize(defaultEntries.take(MAX_APPS))
+            it[KEY_MAX_APPS] = DEFAULT_MAX_APPS
             it[KEY_INIT] = true
             it[KEY_ICON] = DEFAULT_ICON_DP
             it[KEY_FONT] = DEFAULT_FONT_SP
@@ -248,4 +274,7 @@ class HomeStore(private val context: Context) {
                     customName = parts.getOrNull(1)?.takeIf { it.isNotBlank() },
                 )
             }
+
+    private fun deserializeFavorites(raw: String): Set<String> =
+        raw.split("\n").filter { it.isNotBlank() }.toSet()
 }

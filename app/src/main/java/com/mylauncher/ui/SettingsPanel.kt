@@ -75,6 +75,7 @@ fun SettingsScreen(
     customOffsetY: Float,
     listHeightPercent: Int,
     listHeightPercentLandscape: Int,
+    maxApps: Int,
     easterEggEnabled: Boolean,
     meritSoundEnabled: Boolean,
     onIconSize: (Int) -> Unit,
@@ -83,6 +84,7 @@ fun SettingsScreen(
     onShowIcons: (Boolean) -> Unit,
     onShowBadges: (Boolean) -> Unit,
     onShowOriginalColor: (Boolean) -> Unit,
+    onMaxApps: (Int) -> Unit,
     onEasterEgg: (Boolean) -> Unit,
     onMeritSound: (Boolean) -> Unit,
     onPickSystemWallpaper: () -> Unit,
@@ -229,6 +231,24 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                    }
+                }
+                SettingRow("桌面槽位数") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BasicText(
+                            text = "$maxApps",
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                            ),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        MiniSlider(
+                            value = maxApps.toFloat(),
+                            range = HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
+                            modifier = Modifier.width(120.dp),
+                            onChange = { onMaxApps(it.roundToInt()) },
+                        )
                     }
                 }
                 SettingRow("显示图标") {

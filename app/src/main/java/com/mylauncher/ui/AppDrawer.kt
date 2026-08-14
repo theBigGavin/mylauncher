@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,7 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -72,7 +76,7 @@ internal data class RowAction(
     val destructive: Boolean = false,
 )
 
-/** 应用抽屉:空白处上滑拉出;点击启动;行内左滑露出 放入桌面/删除/信息。 */
+/** 应用抽屉:空白处上滑拉出;点击启动;行内左滑露出 放入桌面/删除/信息;点行首星标收藏(收藏置顶)。 */
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
@@ -84,13 +88,15 @@ fun AppDrawer(
     customScale: Float,
     customOffsetX: Float,
     customOffsetY: Float,
+    favorites: Set<String>,
     onAddToHome: (AppEntry) -> Unit,
+    onToggleFavorite: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     AppListOverlay(
         title = "所有应用",
-        subtitle = "点击启动 · 左滑管理",
+        subtitle = "点击启动 · 左滑管理 · ★收藏置顶",
         apps = apps,
         iconSize = iconSize,
         fontSize = fontSize,
@@ -100,6 +106,8 @@ fun AppDrawer(
         customScale = customScale,
         customOffsetX = customOffsetX,
         customOffsetY = customOffsetY,
+        favorites = favorites,
+        onToggleFavorite = onToggleFavorite,
         rowActions = { entry ->
             listOf(
                 RowAction(label = "放入", onClick = { onAddToHome(it) }),
@@ -123,6 +131,32 @@ fun AppDrawer(
         },
         onDismiss = onDismiss,
     )
+}
+
+/** 收藏星标:实心 = 已收藏,空心描边 = 未收藏。Canvas 自绘五角星,保证单色 Zune 风格。 */
+@Composable
+private fun FavoriteStar(filled: Boolean, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val outer = size.minDimension / 2f
+        val inner = outer * 0.382f
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val path = Path()
+        for (i in 0 until 10) {
+            val r = if (i % 2 == 0) outer else inner
+            val ang = Math.toRadians(-90.0 + i * 36.0)
+            val x = cx + r * kotlin.math.cos(ang).toFloat()
+            val y = cy + r * kotlin.math.sin(ang).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        val color = Color.White.copy(alpha = if (filled) 0.9f else 0.30f)
+        if (filled) {
+            drawPath(path, color)
+        } else {
+            drawPath(path, color, style = Stroke(width = 1.5.dp.toPx()))
+        }
+    }
 }
 
 private fun deleteApp(context: Context, entry: AppEntry) {
@@ -161,14 +195,16 @@ internal fun AppListOverlay(
     onDismiss: () -> Unit,
     onRowClick: ((AppEntry) -> Unit)? = null,
     rowActions: ((AppEntry) -> List<RowAction>)? = null,
+    favorites: Set<String> = emptySet(),
+    onToggleFavorite: ((AppEntry) -> Unit)? = null,
 ) {
     BackHandler(onBack = onDismiss)
     // 默认不显示系统应用(无图标/无界面的已在仓库层过滤);用户可手动打开
     var showSystem by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val visible = remember(apps, showSystem, query) {
+    val visible = remember(apps, showSystem, query, favorites) {
         val base = if (showSystem) apps else apps.filter { !it.isSystem }
-        if (query.isBlank()) {
+        val filtered = if (query.isBlank()) {
             base
         } else {
             base.filter {
@@ -176,6 +212,8 @@ internal fun AppListOverlay(
                     it.packageName.contains(query, ignoreCase = true)
             }
         }
+        // 收藏置顶:收藏在前,组内保持仓库层排序(stable sort 不改变原顺序)
+        filtered.sortedByDescending { it.component in favorites }
     }
     val config = LocalConfiguration.current
     val currentOnRowClick by rememberUpdatedState(onRowClick)
@@ -343,6 +381,8 @@ internal fun AppListOverlay(
                         val currentActions by rememberUpdatedState(actions)
                         val currentApp by rememberUpdatedState(app)
                         val currentRevealed by rememberUpdatedState(revealed)
+                        val currentFavorites by rememberUpdatedState(favorites)
+                        val currentToggleFavorite by rememberUpdatedState(onToggleFavorite)
                         val slidePx = with(density) { 24.dp.toPx() }
                         // Material 水波纹:手势行手动发射按压交互(触点 = 手指位置)
                         val interactionSource = remember { MutableInteractionSource() }
@@ -356,6 +396,9 @@ internal fun AppListOverlay(
                                 .pointerInput(app.component) {
                                     awaitEachGesture {
                                         val down = awaitFirstDown(requireUnconsumed = false)
+                                        // 行内子按钮(收藏星标/右侧操作)已消费的按下不再处理:
+                                        // 否则星标点按会同时误触发行点击(启动应用)
+                                        if (down.isConsumed) return@awaitEachGesture
                                         val press = PressInteraction.Press(down.position)
                                         scope.launch { interactionSource.emit(press) }
                                         when (val outcome = awaitPressOutcome(down)) {
@@ -461,6 +504,26 @@ internal fun AppListOverlay(
                                         ),
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            // 收藏星标:行首固定,点按切换收藏(收藏在列表中置顶);
+                            // 左滑展开操作按钮时随按钮淡出。触控区 34dp 不越出左边缘留白,不与内容重叠
+                            if (currentToggleFavorite != null) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.CenterStart)
+                                        .padding(start = 16.dp)
+                                        .size(34.dp)
+                                        .graphicsLayer { alpha = 1f - buttonsAlpha }
+                                        .clickable(enabled = !revealed) {
+                                            currentToggleFavorite?.invoke(currentApp)
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    FavoriteStar(
+                                        filled = app.component in currentFavorites,
+                                        modifier = Modifier.size(16.dp),
                                     )
                                 }
                             }

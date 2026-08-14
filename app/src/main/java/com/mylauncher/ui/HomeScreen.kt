@@ -157,8 +157,14 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         }
     }
     LaunchedEffect(items, apps, data) {
-        if (apps != null && data != null && data.initialized && items.size != data.entries.size) {
-            store.setEntries(items.map { StoredEntry(it.app.component, it.customName) })
+        if (apps != null && data != null && data.initialized) {
+            // 已卸载剔除 + 槽位数下调时的超额裁剪(槽位数上调不自动补)
+            val overLimit = data.entries.size > data.maxApps
+            if (items.size != data.entries.size || overLimit) {
+                store.setEntries(
+                    items.take(data.maxApps).map { StoredEntry(it.app.component, it.customName) }
+                )
+            }
         }
     }
 
@@ -327,6 +333,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         showOriginalColor = data.showOriginalColor,
                         showBadges = data.showBadges,
                         badgeCounts = badgeCounts,
+                        maxApps = data.maxApps,
                         landscape = false,
                         onLaunch = { launch(context, repo, it.app) },
                         onReplace = { picker = PickerRequest.Replace(it) },
@@ -399,6 +406,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         showOriginalColor = data.showOriginalColor,
                         showBadges = data.showBadges,
                         badgeCounts = badgeCounts,
+                        maxApps = data.maxApps,
                         landscape = true,
                         onLaunch = { launch(context, repo, it.app) },
                         onReplace = { picker = PickerRequest.Replace(it) },
@@ -466,6 +474,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     customOffsetY = wpOffsetY,
                     listHeightPercent = data.listHeightPercent,
                     listHeightPercentLandscape = data.listHeightPercentLandscape,
+                    maxApps = data.maxApps,
                     easterEggEnabled = data.easterEggEnabled,
                     meritSoundEnabled = data.meritSoundEnabled,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
@@ -474,6 +483,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onShowIcons = { scope.launch { store.setShowIcons(it) } },
                     onShowBadges = { scope.launch { store.setShowBadges(it) } },
                     onShowOriginalColor = { scope.launch { store.setShowOriginalColor(it) } },
+                    onMaxApps = { scope.launch { store.setMaxApps(it) } },
                     onEasterEgg = { scope.launch { store.setEasterEggEnabled(it) } },
                     onMeritSound = { scope.launch { store.setMeritSoundEnabled(it) } },
                     onPickSystemWallpaper = {
@@ -512,7 +522,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     is PickerRequest.Add -> scope.launch {
                         val cur = data.entries
                         if (cur.none { it.component == entry.component } &&
-                            cur.size < HomeStore.MAX_APPS
+                            cur.size < data.maxApps
                         ) {
                             store.setEntries(cur + StoredEntry(entry.component, null))
                         }
@@ -554,15 +564,19 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 customScale = wpScale,
                 customOffsetX = wpOffsetX,
                 customOffsetY = wpOffsetY,
+                favorites = data.favorites,
                 onAddToHome = { entry ->
                     scope.launch {
                         val cur = data.entries
                         if (cur.none { it.component == entry.component } &&
-                            cur.size < HomeStore.MAX_APPS
+                            cur.size < data.maxApps
                         ) {
                             store.setEntries(cur + StoredEntry(entry.component, null))
                         }
                     }
+                },
+                onToggleFavorite = { entry ->
+                    scope.launch { store.toggleFavorite(entry.component, entry.component !in data.favorites) }
                 },
                 onDismiss = { drawerOpen = false },
             )

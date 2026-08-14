@@ -77,7 +77,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.mylauncher.data.AppEntry
-import com.mylauncher.data.HomeStore
 import com.mylauncher.icons.rememberColorIcon
 import com.mylauncher.icons.rememberMonoIcon
 import kotlinx.coroutines.delay
@@ -348,6 +347,8 @@ fun AppList(
     showOriginalColor: Boolean,
     showBadges: Boolean,
     badgeCounts: Map<String, Int>,
+    /** 桌面槽位数上限:列表满员后隐藏"添加应用"行。 */
+    maxApps: Int,
     landscape: Boolean,
     onLaunch: (HomeItem) -> Unit,
     onReplace: (index: Int) -> Unit,
@@ -662,7 +663,7 @@ fun AppList(
             }
         }
 
-        if (showAddRow && items.size < HomeStore.MAX_APPS) {
+        if (showAddRow && items.size < maxApps) {
             item(key = "__add__") {
                 AddRow(
                     iconSize = iconSize,
