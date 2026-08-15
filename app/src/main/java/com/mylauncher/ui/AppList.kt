@@ -447,10 +447,11 @@ fun AppList(
             addShowTick = 0
         }
     }
-    // 追加行露出:独立协程即时跳到列表末尾(不动画——动画会被用户拖拽打断导致行一直不出现);
-    // 列表已满(maxApps)或未溢出时跳过
-    LaunchedEffect(showAddRow, items.size) {
-        if (showAddRow && items.isNotEmpty() && items.size < maxApps) {
+    // 追加行露出:跟着 tick 走(松手时 tick 会再 +1,此刻滚动互斥锁已释放,
+    // 即时跳到列表末尾不等待 fling;不动画——动画会被用户拖拽打断导致行一直不出现);
+    // 列表已满(maxApps)时跳过
+    LaunchedEffect(addShowTick, items.size) {
+        if (addShowTick > 0 && items.isNotEmpty() && items.size < maxApps) {
             runCatching { scrollState.scrollToItem(items.size) }
         }
     }
