@@ -474,7 +474,12 @@ fun AppList(
                                 addShowTick++
                             }
                         }
-                        if (up) break
+                        if (up) {
+                            // 松手时重新计时:行在拖拽结束后才完整出现,3s 隐藏窗口从松手起算
+                            // (否则长拖拽结束时窗口已耗尽,行一闪而过看起来像"拉不出")
+                            if (dragged) addShowTick++
+                            break
+                        }
                     }
                 }
             },
