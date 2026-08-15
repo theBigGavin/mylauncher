@@ -2,6 +2,7 @@ package com.mylauncher.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -261,7 +262,15 @@ private fun AddRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
+    // 行自身缓进:出现时淡入(配合 animateItem 的展开,不再闪出)
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(280)) }
+    Row(
+        modifier = modifier
+            .graphicsLayer { this.alpha = alpha.value }
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         if (landscape) {
             Spacer(Modifier.weight(1f))
         }
@@ -447,10 +456,14 @@ fun AppList(
             addShowTick = 0
         }
     }
-    // 追加行露出:跟着 tick 走(松手时 tick 会再 +1,此刻滚动互斥锁已释放,动画不被拖拽打断),
-    // 平滑滚动到列表末尾露出追加行;列表已满(maxApps)时跳过
-    LaunchedEffect(addShowTick, items.size) {
-        if (addShowTick > 0 && items.isNotEmpty() && items.size < maxApps) {
+    // 追加行露出:仅在行出现的那一次(showAddRow 翻转)平滑滚动到列表末尾;
+    // 先等滚动互斥锁释放(用户拖拽/松手 fling 期间动画会被打断或闪跳),空闲后再动画。
+    // 注意:不能跟着 tick 走 —— 每次拖动的松手都会 tick+1,列表会被反复拽回底部无法上滑
+    LaunchedEffect(showAddRow, items.size) {
+        if (showAddRow && items.isNotEmpty() && items.size < maxApps) {
+            while (scrollState.isScrollInProgress) {
+                delay(80)
+            }
             runCatching { scrollState.animateScrollToItem(items.size) }
         }
     }
