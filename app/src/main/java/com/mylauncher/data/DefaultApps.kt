@@ -51,10 +51,12 @@ object DefaultApps {
 
     /** 从已排序的应用列表中选出默认常用应用(保持 SLOTS 顺序,逐槽位先包名后关键词)。 */
     fun pick(apps: List<AppEntry>): List<AppEntry> {
+        // 默认槽位只从主用户应用里选(应用分身不参与默认匹配)
+        val candidates = apps.filter { it.isMainUser }
         val picked = mutableListOf<AppEntry>()
         fun contains(e: AppEntry) = picked.any { it.component == e.component }
         fun takeFirst(pred: (AppEntry) -> Boolean) {
-            apps.firstOrNull { pred(it) && !contains(it) }?.let { picked.add(it) }
+            candidates.firstOrNull { pred(it) && !contains(it) }?.let { picked.add(it) }
         }
 
         for (slot in SLOTS) {
@@ -67,7 +69,7 @@ object DefaultApps {
             }
         }
         // 不足时用剩余的非系统应用补足(避免默认塞入系统应用)
-        for (a in apps) {
+        for (a in candidates) {
             if (picked.size >= DEFAULT_COUNT) break
             if (!a.isSystem) takeFirst { it.component == a.component }
         }

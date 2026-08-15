@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,9 +54,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import kotlin.math.abs
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -69,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import com.mylauncher.data.AppEntry
 import com.mylauncher.icons.rememberColorIcon
 import com.mylauncher.icons.rememberMonoIcon
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** 抽屉行左滑露出的文字操作。 */
@@ -91,6 +95,7 @@ fun AppDrawer(
     customOffsetX: Float,
     customOffsetY: Float,
     favorites: Set<String>,
+    onLaunch: (AppEntry) -> Unit,
     onAddToHome: (AppEntry) -> Unit,
     onToggleFavorite: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
@@ -111,23 +116,22 @@ fun AppDrawer(
         favorites = favorites,
         onToggleFavorite = onToggleFavorite,
         rowActions = { entry ->
-            listOf(
-                RowAction(label = "放入", onClick = { onAddToHome(it) }),
-                RowAction(label = "删除", destructive = true, onClick = { deleteApp(context, it) }),
-                RowAction(label = "信息", onClick = { appInfo(context, it) }),
-            )
+            // 应用分身只提供"放入桌面":删除/信息走的是主用户路径,对分身不适用
+            if (entry.isMainUser) {
+                listOf(
+                    RowAction(label = "放入", onClick = { onAddToHome(it) }),
+                    RowAction(label = "删除", destructive = true, onClick = { deleteApp(context, it) }),
+                    RowAction(label = "信息", onClick = { appInfo(context, it) }),
+                )
+            } else {
+                listOf(
+                    RowAction(label = "放入", onClick = { onAddToHome(it) }),
+                )
+            }
         },
         // 点击行 = 启动该应用(与副标题"点击启动"一致)
         onRowClick = { entry ->
-            runCatching {
-                context.startActivity(
-                    Intent(Intent.ACTION_MAIN).apply {
-                        addCategory(Intent.CATEGORY_LAUNCHER)
-                        setClassName(entry.packageName, entry.activityName)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            }
+            onLaunch(entry)
             // 启动后收起抽屉:从应用返回时直接回主屏,不再停留在抽屉
             onDismiss()
         },
@@ -370,6 +374,13 @@ internal fun AppListOverlay(
                         var revealed by remember { mutableStateOf(false) }
                         var dragProgress by remember { mutableStateOf(0f) } // 拖拽进度 0..1,驱动按钮跟手
                         var pressed by remember { mutableStateOf(false) }   // 按压反馈
+                        // 展开后无操作超时自动收起(点按钮/再滑右都会重置计时)
+                        LaunchedEffect(revealed) {
+                            if (revealed) {
+                                delay(3000)
+                                revealed = false
+                            }
+                        }
                         val buttonsAlpha by animateFloatAsState(
                             targetValue = if (revealed) 1f else dragProgress,
                             label = "drawerRevealAlpha",
@@ -434,10 +445,36 @@ internal fun AppListOverlay(
                                             }
                                             PressOutcome.LongPress -> {
                                                 // 部分设备/注入下 UP 延迟超过长按时限,点击会被判成长按 ——
-                                                // 未展开时同样启动应用,保证点击可用
+                                                // 未展开时同样启动应用,保证点击可用。
+                                                // 但慢速滚动时手指会在长按窗口内持续产生 sub-slop 位移:
+                                                // 静候抬手,仅当手指始终静止(抬手时位移仍很小)才启动,
+                                                // 否则按滚动意图放弃 —— 否则慢速滚动会误启动应用
                                                 scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
-                                                if (currentRevealed) revealed = false
-                                                else currentOnRowClick?.invoke(app)
+                                                if (currentRevealed) {
+                                                    revealed = false
+                                                } else {
+                                                    var moved = 0f
+                                                    while (true) {
+                                                        val event = awaitPointerEvent(PointerEventPass.Main)
+                                                        var up = false
+                                                        for (change in event.changes) {
+                                                            if (change.id != down.id) continue
+                                                            moved = maxOf(
+                                                                moved,
+                                                                abs(change.position.x - down.position.x),
+                                                                abs(change.position.y - down.position.y),
+                                                            )
+                                                            if (change.changedToUp()) {
+                                                                up = true
+                                                                break
+                                                            }
+                                                        }
+                                                        if (up) break
+                                                    }
+                                                    if (moved < viewConfiguration.touchSlop * 0.4f) {
+                                                        currentOnRowClick?.invoke(app)
+                                                    }
+                                                }
                                             }
                                             PressOutcome.Cancelled -> {
                                                 scope.launch { interactionSource.emit(PressInteraction.Cancel(press)) }

@@ -118,6 +118,7 @@ internal suspend fun AwaitPointerEventScope.awaitPressOutcome(down: PointerInput
     val slop = viewConfiguration.touchSlop
     // 注意:这是 AwaitPointerEventScope 自带的 withTimeoutOrNull,
     // 超时抛 PointerEventTimeoutCancellationException(非 kotlinx 的),因此用 OrNull 变体。
+    var maxDelta = 0f
     val result = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
         var finished = false
         var outcome = PressOutcome.Tap
@@ -131,6 +132,7 @@ internal suspend fun AwaitPointerEventScope.awaitPressOutcome(down: PointerInput
                 }
                 val dx = change.position.x - down.position.x
                 val dy = change.position.y - down.position.y
+                maxDelta = maxOf(maxDelta, maxOf(abs(dx), abs(dy)))
                 if (abs(dx) > slop && abs(dx) > abs(dy)) {
                     outcome = if (dx < 0) PressOutcome.SwipeLeft else PressOutcome.SwipeRight
                     finished = true
@@ -145,7 +147,10 @@ internal suspend fun AwaitPointerEventScope.awaitPressOutcome(down: PointerInput
         }
         outcome
     }
-    return result ?: PressOutcome.LongPress
+    // 超时判长按前先看手指是否动过:慢速滚动时 sub-slop 位移会持续整个长按窗口,
+    // 若仍判长按会误触发行内动作(抽屉行直接启动应用)—— 有明显位移按滚动意图取消。
+    // 真正的长按手指静止,抖动远小于 0.4 倍 slop。
+    return result ?: if (maxDelta > slop * 0.4f) PressOutcome.Cancelled else PressOutcome.LongPress
 }
 
 /** 行高:max(图标, 字号*1.2) + 上下各 10dp 内边距 + 行距。 */
@@ -368,6 +373,13 @@ fun AppList(
     // 单行展开状态:只有该行左滑,其余行与列都保持原位
     var revealedIndex by remember { mutableIntStateOf(-1) }
     fun setRevealed(i: Int) { revealedIndex = i }
+    // 展开后无操作超时自动收起(点按钮/再滑右都会重置计时)
+    LaunchedEffect(revealedIndex) {
+        if (revealedIndex >= 0) {
+            delay(3000)
+            revealedIndex = -1
+        }
+    }
 
     // pointerInput 手势闭包不会因数据变化而重启,必须经 rememberUpdatedState 取最新值
     val currentItems by rememberUpdatedState(items)

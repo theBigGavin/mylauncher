@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -182,8 +183,11 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val soundEnabled by rememberUpdatedState(
         data?.easterEggEnabled == true && data?.meritSoundEnabled == true
     )
+    // 最近一次边缘按下敲击的时刻:返回手势完成回调据此去重,避免同一手势响两声
+    var lastEdgeKnockMs by remember { mutableLongStateOf(0L) }
     fun knockNow() {
         if (soundEnabled && picker == null && !drawerOpen && !showSettings) {
+            lastEdgeKnockMs = System.currentTimeMillis()
             KnockSound.play()
         }
     }
@@ -198,7 +202,11 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     meritSeq++
                     meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
                     if (d.meritSoundEnabled == true) {
-                        KnockSound.play()
+                        // 同一手势:边缘按下已敲过就不重复;按键返回等无边缘触发的路径在此补敲。
+                        // 不做全局时长去重 —— 快速连击每次手势都要响(拟真木鱼连敲)
+                        if (System.currentTimeMillis() - lastEdgeKnockMs > 1000) {
+                            KnockSound.play()
+                        }
                     }
                 }
             }
@@ -335,7 +343,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         badgeCounts = badgeCounts,
                         maxApps = data.maxApps,
                         landscape = false,
-                        onLaunch = { launch(context, repo, it.app) },
+                        onLaunch = { launch(repo, it.app) },
                         onReplace = { picker = PickerRequest.Replace(it) },
                         onRename = { renameIndex = it },
                         onRemove = { i ->
@@ -408,7 +416,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         badgeCounts = badgeCounts,
                         maxApps = data.maxApps,
                         landscape = true,
-                        onLaunch = { launch(context, repo, it.app) },
+                        onLaunch = { launch(repo, it.app) },
                         onReplace = { picker = PickerRequest.Replace(it) },
                         onRename = { renameIndex = it },
                         onRemove = { i ->
@@ -565,6 +573,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 customOffsetX = wpOffsetX,
                 customOffsetY = wpOffsetY,
                 favorites = data.favorites,
+                onLaunch = { launch(repo, it) },
                 onAddToHome = { entry ->
                     scope.launch {
                         val cur = data.entries
@@ -585,6 +594,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
 
 }
 
-private fun launch(context: Context, repo: AppRepository, entry: AppEntry) {
-    runCatching { context.startActivity(repo.launchIntent(entry)) }
+private fun launch(repo: AppRepository, entry: AppEntry) {
+    // 主用户走 startActivity,分身经 LauncherApps.startMainActivity 定位到对应用户
+    repo.launch(entry)
 }
