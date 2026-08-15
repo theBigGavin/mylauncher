@@ -35,6 +35,8 @@ data class HomeData(
     val meritCount: Int,
     val meritDate: String,
     val easterEggEnabled: Boolean,
+    /** 彩蛋是否已解锁(设置页连点版本号 5 次激活,激活后才显示彩蛋设置分组)。 */
+    val easterEggUnlocked: Boolean,
     val meritSoundEnabled: Boolean,
     val wallpaperMode: String,
     /** 桌面列表视口高度(占屏高百分比,横竖屏分开配置)。 */
@@ -85,6 +87,7 @@ class HomeStore(private val context: Context) {
         private val KEY_MERIT_COUNT = intPreferencesKey("merit_count")
         private val KEY_MERIT_DATE = stringPreferencesKey("merit_date")
         private val KEY_EASTER_EGG = booleanPreferencesKey("easter_egg_enabled")
+        private val KEY_EASTER_UNLOCKED = booleanPreferencesKey("easter_egg_unlocked")
         private val KEY_MERIT_SOUND = booleanPreferencesKey("merit_sound_enabled")
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
         private val KEY_LIST_HEIGHT = intPreferencesKey("list_height_percent")
@@ -115,7 +118,8 @@ class HomeStore(private val context: Context) {
             showOriginalColor = p[KEY_SHOW_COLOR] ?: false,
             meritCount = p[KEY_MERIT_COUNT] ?: 0,
             meritDate = p[KEY_MERIT_DATE] ?: "",
-            easterEggEnabled = p[KEY_EASTER_EGG] ?: true,
+            easterEggEnabled = p[KEY_EASTER_EGG] ?: false,
+            easterEggUnlocked = p[KEY_EASTER_UNLOCKED] ?: false,
             meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
             listHeightPercent = p[KEY_LIST_HEIGHT] ?: DEFAULT_LIST_HEIGHT_PERCENT,
@@ -170,7 +174,7 @@ class HomeStore(private val context: Context) {
     }
 
     suspend fun setRowSpacing(value: Int) {
-        context.homeDataStore.edit { it[KEY_ROW_SPACING] = value.coerceIn(0, 48) }
+        context.homeDataStore.edit { it[KEY_ROW_SPACING] = value.coerceIn(0, 10) }
     }
 
     suspend fun setShowBadges(value: Boolean) {
@@ -196,6 +200,11 @@ class HomeStore(private val context: Context) {
 
     suspend fun setEasterEggEnabled(value: Boolean) {
         context.homeDataStore.edit { it[KEY_EASTER_EGG] = value }
+    }
+
+    /** 解锁彩蛋(设置页连点版本号 5 次):解锁后显示彩蛋设置分组。 */
+    suspend fun setEasterEggUnlocked() {
+        context.homeDataStore.edit { it[KEY_EASTER_UNLOCKED] = true }
     }
 
     suspend fun setMeritSoundEnabled(value: Boolean) {
@@ -260,7 +269,8 @@ class HomeStore(private val context: Context) {
             it[KEY_ROW_SPACING] = DEFAULT_ROW_SPACING_DP
             it[KEY_SHOW_BADGES] = true
             it[KEY_SHOW_COLOR] = false
-            it[KEY_EASTER_EGG] = true
+            it[KEY_EASTER_EGG] = false
+            it[KEY_EASTER_UNLOCKED] = false
             it[KEY_MERIT_SOUND] = true
             it[KEY_MERIT_COUNT] = 0
             it[KEY_WALLPAPER] = WALLPAPER_BUILTIN

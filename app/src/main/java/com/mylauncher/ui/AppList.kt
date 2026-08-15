@@ -440,15 +440,18 @@ fun AppList(
     // 超时自动隐藏 —— 点击已注册的拖动次数,每次拖动重置计时
     var addShowTick by remember { mutableIntStateOf(0) }
     val showAddRow = items.isEmpty() || addShowTick > 0
+    // 隐藏计时独立运行:任何滚动/拖拽异常都不影响 3s 自动收起
     LaunchedEffect(addShowTick, items.isEmpty()) {
         if (addShowTick > 0 && items.isNotEmpty()) {
-            // 列表已溢出时,"添加应用"行追加在视口外,用户看不到(竖屏常见):
-            // 滚动到底把它露出来;列表未满时不产生位移
-            if (items.size < maxApps) {
-                scrollState.animateScrollToItem(items.size)
-            }
             delay(3000)
             addShowTick = 0
+        }
+    }
+    // 追加行露出:独立协程即时跳到列表末尾(不动画——动画会被用户拖拽打断导致行一直不出现);
+    // 列表已满(maxApps)或未溢出时跳过
+    LaunchedEffect(showAddRow, items.size) {
+        if (showAddRow && items.isNotEmpty() && items.size < maxApps) {
+            runCatching { scrollState.scrollToItem(items.size) }
         }
     }
     LazyColumn(

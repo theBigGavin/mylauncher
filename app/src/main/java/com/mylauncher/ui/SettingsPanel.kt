@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -77,6 +78,7 @@ fun SettingsScreen(
     listHeightPercentLandscape: Int,
     maxApps: Int,
     easterEggEnabled: Boolean,
+    easterEggUnlocked: Boolean,
     meritSoundEnabled: Boolean,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
@@ -86,6 +88,7 @@ fun SettingsScreen(
     onShowOriginalColor: (Boolean) -> Unit,
     onMaxApps: (Int) -> Unit,
     onEasterEgg: (Boolean) -> Unit,
+    onUnlockEasterEgg: () -> Unit,
     onMeritSound: (Boolean) -> Unit,
     onPickSystemWallpaper: () -> Unit,
     onListHeight: (form: String, value: Int) -> Unit,
@@ -133,6 +136,8 @@ fun SettingsScreen(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                // 上滚避让系统状态栏:滚动区顶在状态栏之下,内容不会被状态栏压住
+                .statusBarsPadding()
                 // 与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN),不再用更宽的 80dp
                 .padding(start = PORTRAIT_ROW_MARGIN, end = PORTRAIT_ROW_MARGIN, bottom = 80.dp)
         ) {
@@ -182,7 +187,7 @@ fun SettingsScreen(
                 SettingRow("列表行距") {
                     MiniSlider(
                         value = rowSpacing.toFloat(),
-                        range = 0f..48f,
+                        range = 0f..10f,
                         modifier = Modifier.width(150.dp),
                         onChange = { onRowSpacing(it.roundToInt()) },
                     )
@@ -209,6 +214,24 @@ fun SettingsScreen(
                 SettingRow("图标原彩") {
                     MiniSwitch(checked = showOriginalColor, onChange = onShowOriginalColor)
                 }
+                SettingRow("桌面槽位数") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BasicText(
+                            text = "$maxApps",
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                            ),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        MiniSlider(
+                            value = maxApps.toFloat(),
+                            range = HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
+                            modifier = Modifier.width(120.dp),
+                            onChange = { onMaxApps(it.roundToInt()) },
+                        )
+                    }
+                }
                 SettingRow("壁纸") {
                     BasicText(
                         text = when (wallpaperMode) {
@@ -228,25 +251,36 @@ fun SettingsScreen(
                     strong = false,
                 )
 
-                SettingSection("桌面")
-                SettingRow("桌面槽位数") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BasicText(
-                            text = "$maxApps",
-                            style = TextStyle(
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 14.sp,
-                            ),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        MiniSlider(
-                            value = maxApps.toFloat(),
-                            range = HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
-                            modifier = Modifier.width(120.dp),
-                            onChange = { onMaxApps(it.roundToInt()) },
-                        )
+                SettingSection("通知")
+                SettingRow("通知角标") {
+                    MiniSwitch(checked = showBadges, onChange = onShowBadges)
+                }
+                if (showBadges && !listenerEnabled) {
+                    TextButton(
+                        text = "开启系统通知使用权(角标需要)",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                )
+                            }
+                        },
+                        strong = false,
+                    )
+                }
+
+                // 彩蛋设置分组:默认隐藏,连点页脚版本号 5 次解锁后才显示
+                if (easterEggUnlocked) {
+                    SettingSection("彩蛋")
+                    SettingRow("功德彩蛋(边缘滑入)") {
+                        MiniSwitch(checked = easterEggEnabled, onChange = onEasterEgg)
+                    }
+                    SettingRow("木鱼音效") {
+                        MiniSwitch(checked = meritSoundEnabled, onChange = onMeritSound)
                     }
                 }
+
+                SettingSection("其他")
                 SettingRow("默认桌面") {
                     BasicText(
                         text = if (isDefaultLauncher) "已设为默认" else (defaultLabel ?: "未设置"),
@@ -266,37 +300,9 @@ fun SettingsScreen(
                                 context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
                             }
                         },
-                        strong = true,
-                    )
-                }
-
-                SettingSection("通知")
-                SettingRow("通知角标") {
-                    MiniSwitch(checked = showBadges, onChange = onShowBadges)
-                }
-                if (showBadges && !listenerEnabled) {
-                    TextButton(
-                        text = "开启系统通知使用权(角标需要)",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                )
-                            }
-                        },
                         strong = false,
                     )
                 }
-
-                SettingSection("彩蛋")
-                SettingRow("功德彩蛋(边缘滑入)") {
-                    MiniSwitch(checked = easterEggEnabled, onChange = onEasterEgg)
-                }
-                SettingRow("木鱼音效") {
-                    MiniSwitch(checked = meritSoundEnabled, onChange = onMeritSound)
-                }
-
-                SettingSection("其他")
                 TextButton(
                     text = "恢复默认布局",
                     onClick = onReset,
@@ -308,13 +314,23 @@ fun SettingsScreen(
                     strong = false,
                 )
                 Spacer(Modifier.height(28.dp))
-                // 页脚:版本号 + GitHub logo(点击打开仓库)
+                // 页脚:版本号 + GitHub logo(点击打开仓库);连点版本号 5 次解锁彩蛋设置分组
                 val versionName = runCatching {
                     context.packageManager.getPackageInfo(context.packageName, 0).versionName
                 }.getOrNull()
+                var versionTaps by remember { mutableIntStateOf(0) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     BasicText(
                         text = "MyLauncher v${versionName ?: "?"}",
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                versionTaps++
+                                if (versionTaps >= 5 && !easterEggUnlocked) {
+                                    onUnlockEasterEgg()
+                                }
+                            }
+                            .padding(vertical = 6.dp),
                         style = TextStyle(
                             color = Color.White.copy(alpha = 0.45f),
                             fontSize = 13.sp,

@@ -21,11 +21,23 @@ object BadgeStore {
  */
 class BadgeService : NotificationListenerService() {
 
-    override fun onListenerConnected() = updateCounts()
+    companion object {
+        /** 供主屏在 ON_RESUME/周期时机主动请求重算计数(部分 ROM 的通知回调会丢,靠重算兜底)。 */
+        var requestRefresh: (() -> Unit)? = null
+    }
+
+    override fun onListenerConnected() {
+        requestRefresh = ::updateCounts
+        updateCounts()
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) = updateCounts()
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = updateCounts()
+
+    override fun onListenerDisconnected() {
+        requestRefresh = null
+    }
 
     /** 通知所属用户的角标键:分身通知(如 ColorOS 转发)可能与原应用同包名,按用户区分。 */
     private fun badgeKey(sbn: StatusBarNotification): String {

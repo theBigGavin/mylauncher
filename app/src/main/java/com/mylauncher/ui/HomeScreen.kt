@@ -51,11 +51,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.mylauncher.badges.BadgeService
 import com.mylauncher.badges.BadgeStore
 import com.mylauncher.data.AppEntry
 import com.mylauncher.icons.warmUpIcons
@@ -64,7 +66,10 @@ import com.mylauncher.data.DefaultApps
 import com.mylauncher.data.HomeStore
 import com.mylauncher.data.StoredEntry
 import com.mylauncher.LauncherEvents
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -84,6 +89,22 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val allApps by repo.apps.collectAsState()
     val homeData by store.data.collectAsState(initial = null)
     val badgeCounts by BadgeStore.counts.collectAsState()
+
+    // 通知角标兜底:部分 ROM 会丢通知回调(角标停在旧值/清零),ON_RESUME 与可见期间周期重算
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) BadgeService.requestRefresh?.invoke()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            BadgeService.requestRefresh?.invoke()
+            delay(5000)
+        }
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { repo.refresh() }
@@ -484,6 +505,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     listHeightPercentLandscape = data.listHeightPercentLandscape,
                     maxApps = data.maxApps,
                     easterEggEnabled = data.easterEggEnabled,
+                    easterEggUnlocked = data.easterEggUnlocked,
                     meritSoundEnabled = data.meritSoundEnabled,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
@@ -493,6 +515,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onShowOriginalColor = { scope.launch { store.setShowOriginalColor(it) } },
                     onMaxApps = { scope.launch { store.setMaxApps(it) } },
                     onEasterEgg = { scope.launch { store.setEasterEggEnabled(it) } },
+                    onUnlockEasterEgg = { scope.launch { store.setEasterEggUnlocked() } },
                     onMeritSound = { scope.launch { store.setMeritSoundEnabled(it) } },
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
