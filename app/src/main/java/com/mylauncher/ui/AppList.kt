@@ -1,8 +1,13 @@
 package com.mylauncher.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -259,23 +264,10 @@ private fun AddRow(
     fontSize: TextUnit,
     showIcons: Boolean,
     landscape: Boolean,
-    /** 淡入开关:由列表在"滚动露出到位"后置 true,行才淡入 —— 与滚动错开,避免闪出。 */
-    visible: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(280),
-        label = "addRowAlpha",
-    )
-    Row(
-        modifier = modifier
-            .graphicsLayer { this.alpha = alpha }
-            // 隐藏期不挂 clickable:alpha 0 不影响命中,否则会吞掉该位置的点击
-            .then(if (visible) Modifier.clickable(onClick = onClick) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(modifier = modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
         if (landscape) {
             Spacer(Modifier.weight(1f))
         }
@@ -731,20 +723,26 @@ fun AppList(
 
         if (items.size < maxApps) {
             item(key = "__add__") {
-                AddRow(
-                    iconSize = iconSize,
-                    fontSize = fontSize,
-                    showIcons = showIcons,
-                    landscape = landscape,
+                // 视觉显隐 + 高度动画:隐藏后不占视口空间,显示时淡入+展开,隐藏时淡出+收起
+                AnimatedVisibility(
                     visible = addRowShown,
-                    onClick = onAdd,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(rowHeight)
-                        // 横屏与普通行一致用 12dp;竖屏用主屏行边距 PORTRAIT_ROW_MARGIN
-                        // (横屏曾误用 80dp 导致"添加应用"名称被裁掉)
-                        .padding(horizontal = if (landscape) 12.dp else PORTRAIT_ROW_MARGIN),
-                )
+                    enter = fadeIn(tween(280)) + expandVertically(tween(280)),
+                    exit = fadeOut(tween(280)) + shrinkVertically(tween(280)),
+                ) {
+                    AddRow(
+                        iconSize = iconSize,
+                        fontSize = fontSize,
+                        showIcons = showIcons,
+                        landscape = landscape,
+                        onClick = onAdd,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(rowHeight)
+                            // 横屏与普通行一致用 12dp;竖屏用主屏行边距 PORTRAIT_ROW_MARGIN
+                            // (横屏曾误用 80dp 导致"添加应用"名称被裁掉)
+                            .padding(horizontal = if (landscape) 12.dp else PORTRAIT_ROW_MARGIN),
+                    )
+                }
             }
         }
     }
