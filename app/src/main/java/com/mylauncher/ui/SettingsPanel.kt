@@ -120,7 +120,9 @@ fun SettingsScreen(
             }.getOrNull()
         }
     }
-    val listenerEnabled = remember { isBadgeListenerEnabled(context) }
+    // 与默认桌面检测一样:从系统通知使用权设置页返回时重查,
+    // 否则授权后入口不会立即隐藏(要重进设置页才刷新 —— 修过的坑)
+    val listenerEnabled = remember(resumeTick) { isBadgeListenerEnabled(context) }
 
     // 列表行距:连续滑条(与其它尺寸类设置一致),不再用离散档位
 
