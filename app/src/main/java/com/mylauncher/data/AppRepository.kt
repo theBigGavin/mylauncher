@@ -34,6 +34,10 @@ data class AppEntry(
 
     /** 是否主用户应用(非分身)。 */
     val isMainUser: Boolean get() = user == Process.myUserHandle()
+
+    /** 通知角标键:主用户 = 包名,分身 = "包名#userId"(与 BadgeStore.counts 的键一致)。 */
+    val badgeKey: String get() =
+        if (isMainUser) packageName else "$packageName#${user.hashCode()}"
 }
 
 class AppRepository(context: Context) {

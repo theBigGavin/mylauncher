@@ -657,7 +657,7 @@ fun AppList(
                                     rememberMonoIcon(item.app, iconSize)
                                 },
                                 size = iconSize,
-                                badgeCount = if (showBadges) (badgeCounts[item.app.packageName] ?: 0) else 0,
+                                badgeCount = if (showBadges) (badgeCounts[item.app.badgeKey] ?: 0) else 0,
                             )
                             Spacer(Modifier.width(if (landscape) 18.dp else 16.dp))
                         }
