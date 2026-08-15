@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     kotlin("android")
     kotlin("plugin.compose")
+}
+
+// 发布签名:密钥库在仓库外(~/.android/mylauncher-keys),凭据在 gitignored 的 keystore.properties;
+// 文件缺失时回退 debug 签名,保证其他机器/CI 也能构建 release
+val releaseProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -16,6 +25,17 @@ android {
         versionName = "1.3.1"
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseProps.isNotEmpty()) {
+                storeFile = file(releaseProps.getProperty("storeFile"))
+                storePassword = releaseProps.getProperty("storePassword")
+                keyAlias = releaseProps.getProperty("keyAlias")
+                keyPassword = releaseProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         // 交付物极致瘦身:debug 与 release 都开启 R8 压缩 + 资源收缩
         // (debug 保持 debuggable,数据备份迁移依赖 run-as)
@@ -26,6 +46,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = if (releaseProps.isNotEmpty()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
