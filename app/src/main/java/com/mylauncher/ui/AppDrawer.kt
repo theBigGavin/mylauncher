@@ -365,6 +365,18 @@ internal fun AppListOverlay(
                                             LIST_H_MARGIN else PORTRAIT_ROW_MARGIN
                                     ),
                             )
+                            // 选择器行:仅收藏的应用在行首显示实心星标(只读标记,非收藏不显示)
+                            if (onToggleFavorite == null && app.component in favorites) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.CenterStart)
+                                        .padding(start = 16.dp)
+                                        .size(34.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    FavoriteStar(filled = true, modifier = Modifier.size(16.dp))
+                                }
+                            }
                         }
                     } else {
                         // 管理行:整行可手势,左滑露出右侧三个文字操作。
