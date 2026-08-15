@@ -448,10 +448,14 @@ fun AppList(
     // 拖动列表时显示;松手后重新计时,3s 无操作淡出;列表为空时恒显
     var addRowShown by remember { mutableStateOf(items.isEmpty()) }
     var addRowHideTick by remember { mutableIntStateOf(0) }
+    // 拖拽中禁止隐藏:3s 计时器到期时若手指仍在拖,跳过本次隐藏
+    // (快速连续滚动时,上一次松手的计时会在本次拖拽中途到期,行会半路闪掉;
+    // 且到期后 hideTick++ 重启本效果时 addRowShown 已为 false,不再重新排程 —— 修过的坑)
+    var addRowDragActive by remember { mutableStateOf(false) }
     LaunchedEffect(addRowHideTick, items.isEmpty()) {
         if (addRowShown && items.isNotEmpty()) {
             delay(3000)
-            addRowShown = false
+            if (!addRowDragActive) addRowShown = false
         }
     }
     LazyColumn(
@@ -462,7 +466,12 @@ fun AppList(
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var dragged = false
                     while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        // 空闲超时兜底:按下后若 up 被中途打开的浮层吃掉(浮层遮挡命中路径,
+                        // 本观察器收不到该 up),不能永远卡在等 up —— 1.5s 无事件视同手势结束,
+                        // 否则添加应用行从此再也拉不出来(修过的坑)
+                        val event = withTimeoutOrNull(1500) {
+                            awaitPointerEvent(PointerEventPass.Main)
+                        } ?: break
                         var up = false
                         for (change in event.changes) {
                             if (change.id != down.id) continue
@@ -472,6 +481,7 @@ fun AppList(
                             ) {
                                 dragged = true
                                 addRowShown = true
+                                addRowDragActive = true
                             }
                         }
                         if (up) {
@@ -481,6 +491,7 @@ fun AppList(
                             break
                         }
                     }
+                    addRowDragActive = false
                 }
             },
         state = scrollState,
