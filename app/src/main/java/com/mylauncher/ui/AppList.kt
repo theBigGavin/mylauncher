@@ -16,8 +16,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -308,6 +308,13 @@ private fun AddRow(
     }
 }
 
+/** 行左滑露出的文字操作(抽屉行与桌面行共用)。 */
+internal data class RowAction(
+    val label: String,
+    val onClick: (AppEntry) -> Unit,
+    val destructive: Boolean = false,
+)
+
 /** 左滑露出的操作按钮(简单文本按钮,靠行背景提供可读性)。 */
 @Composable
 internal fun RevealButton(
@@ -320,7 +327,6 @@ internal fun RevealButton(
     Box(
         // 未启用时完全不挂 clickable:禁用态 clickable 仍会消费按下,挡住下面行的滑动手势(抽屉右侧区域滑不动)
         modifier
-            .width(actionWidth() / 2)
             .height(48.dp)
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
@@ -335,6 +341,43 @@ internal fun RevealButton(
                 shadow = textShadow,
             ),
         )
+    }
+}
+
+/**
+ * 右缘操作按钮条:淡入 + 自右滑入(未展开时整体透明,不参与命中)。
+ * 桌面行与抽屉行共用;modifier 供调用方追加定位/留白(如抽屉的 12dp 右留白)。
+ */
+@Composable
+internal fun BoxScope.RevealButtonBar(
+    actions: List<RowAction>,
+    alpha: Float,
+    slidePx: Float,
+    rowHeight: Dp,
+    enabled: Boolean,
+    buttonWidth: Dp,
+    modifier: Modifier = Modifier,
+    onAction: (RowAction) -> Unit,
+) {
+    Row(
+        modifier
+            .align(Alignment.CenterEnd)
+            .height(rowHeight)
+            .graphicsLayer {
+                this.alpha = alpha
+                translationX = (1f - alpha) * slidePx
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        actions.forEach { action ->
+            RevealButton(
+                label = action.label,
+                fg = if (action.destructive) Color(0xFFFF8A80) else Color.White,
+                enabled = enabled,
+                modifier = Modifier.width(buttonWidth),
+                onClick = { onAction(action) },
+            )
+        }
     }
 }
 
@@ -486,8 +529,9 @@ fun AppList(
                             .background(Color.White.copy(alpha = rowBgAlpha))
                     )
                 }
-                // 内容层:整行承载手势与 Material 水波纹,但只有落在图标+名称范围才算有效触控
-                // 左滑时内容整体左移(只有本行);触控坐标跟随内容平移,命中检测不变
+                // 内容层:整行承载手势与 Material 水波纹 —— 触发区 = 整行宽(与抽屉行一致);
+                // 行内空白不再漏给壁纸层的手势(长按开设置/上滑开抽屉只在列表视口外生效)
+                // 左滑时内容整体左移(只有本行)
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -502,14 +546,6 @@ fun AppList(
                         .pointerInput(item.app.component, index) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
-                                // 触控区 = 图标+名称(行空白处不响应,避免误触)
-                                // 左滑时内容整体左移:命中区跟随内容位移(两种坐标系都覆盖)
-                                val shifted = contentBounds.translate(-shift.value, 0f)
-                                if (!contentBounds.contains(down.position) &&
-                                    !shifted.contains(down.position)
-                                ) {
-                                    return@awaitEachGesture
-                                }
                                 val press = PressInteraction.Press(down.position)
                                 scope.launch { interactionSource.emit(press) }
                                 when (val outcome = awaitPressOutcome(down)) {
@@ -644,36 +680,31 @@ fun AppList(
                 }
                 // 操作按钮层:必须画在内容层之上(后绘 = 命中优先)——内容层 fillMaxSize 即使透明也会挡按钮的点击(修过的坑);
                 // 未展开时按钮不挂 clickable,命中直接穿透给内容层,行手势不受影响
-                Row(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .height(rowHeight)
-                        .graphicsLayer {
-                            alpha = buttonsAlpha
-                            translationX = (1f - buttonsAlpha) * with(density) { 20.dp.toPx() }
-                        },
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RevealButton(
-                        label = "改名",
-                        fg = Color.White,
-                        enabled = revealed,
-                        onClick = {
-                            setRevealed(-1)
-                            currentOnRename(index)
-                        },
-                    )
-                    RevealButton(
-                        label = "移除",
-                        fg = Color(0xFFFF8A80),
-                        enabled = revealed,
-                        onClick = {
-                            setRevealed(-1)
-                            currentOnRemove(index)
-                        },
-                    )
-                }
+                RevealButtonBar(
+                    actions = listOf(
+                        RowAction(
+                            label = "改名",
+                            onClick = {
+                                setRevealed(-1)
+                                currentOnRename(index)
+                            },
+                        ),
+                        RowAction(
+                            label = "移除",
+                            destructive = true,
+                            onClick = {
+                                setRevealed(-1)
+                                currentOnRemove(index)
+                            },
+                        ),
+                    ),
+                    alpha = buttonsAlpha,
+                    slidePx = with(density) { 20.dp.toPx() },
+                    rowHeight = rowHeight,
+                    enabled = revealed,
+                    buttonWidth = actionWidth() / 2,
+                    onAction = { it.onClick(item.app) },
+                )
             }
         }
 

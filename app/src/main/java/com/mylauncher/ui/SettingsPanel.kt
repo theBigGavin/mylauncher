@@ -150,7 +150,8 @@ fun SettingsScreen(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = LIST_H_MARGIN, end = LIST_H_MARGIN, bottom = 80.dp)
+                // 与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN),不再用更宽的 80dp
+                .padding(start = PORTRAIT_ROW_MARGIN, end = PORTRAIT_ROW_MARGIN, bottom = 80.dp)
         ) {
             Spacer(Modifier.height((config.screenHeightDp * 0.10f).dp))
             BasicText(

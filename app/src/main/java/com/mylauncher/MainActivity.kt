@@ -18,8 +18,6 @@ import com.mylauncher.ui.rememberInnerDisplayUnfolded
 /** 系统返回手势事件(边缘滑入触发):主屏收集后播功德彩蛋。 */
 object LauncherEvents {
     val backGesture = MutableSharedFlow<Unit>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    /** 返回手势刚开始(手指刚滑入):立即敲木鱼,跟手。 */
-    val backStarted = MutableSharedFlow<Unit>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 }
 
 class MainActivity : ComponentActivity() {

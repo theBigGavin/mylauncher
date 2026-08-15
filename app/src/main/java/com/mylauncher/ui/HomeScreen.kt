@@ -525,6 +525,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             showOriginalColor = data.showOriginalColor,
             wallpaperMode = data.wallpaperMode,
             adding = req is PickerRequest.Add,
+            showSystem = data.showSystem,
+            onShowSystemChange = { scope.launch { store.setShowSystem(it) } },
             onPick = { entry ->
                 when (req) {
                     is PickerRequest.Add -> scope.launch {
@@ -573,6 +575,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 customOffsetX = wpOffsetX,
                 customOffsetY = wpOffsetY,
                 favorites = data.favorites,
+                showSystem = data.showSystem,
+                onShowSystemChange = { scope.launch { store.setShowSystem(it) } },
                 onLaunch = { launch(repo, it) },
                 onAddToHome = { entry ->
                     scope.launch {

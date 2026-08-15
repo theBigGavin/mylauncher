@@ -22,6 +22,8 @@ data class HomeData(
     val maxApps: Int,
     /** 收藏的应用组件键集合(抽屉"所有应用"置顶显示)。 */
     val favorites: Set<String>,
+    /** 抽屉/选择器是否显示系统应用(持久化用户习惯)。 */
+    val showSystem: Boolean,
     val iconSizeDp: Int,
     val fontSizeSp: Int,
     val showIcons: Boolean,
@@ -72,6 +74,7 @@ class HomeStore(private val context: Context) {
         private val KEY_ENTRIES = stringPreferencesKey("home_entries")
         private val KEY_MAX_APPS = intPreferencesKey("max_apps")
         private val KEY_FAVORITES = stringPreferencesKey("favorites")
+        private val KEY_SHOW_SYSTEM = booleanPreferencesKey("show_system")
         private val KEY_INIT = booleanPreferencesKey("initialized")
         private val KEY_ICON = intPreferencesKey("icon_size_dp")
         private val KEY_FONT = intPreferencesKey("font_size_sp")
@@ -103,6 +106,7 @@ class HomeStore(private val context: Context) {
             entries = deserialize(p[KEY_ENTRIES].orEmpty()),
             maxApps = p[KEY_MAX_APPS] ?: DEFAULT_MAX_APPS,
             favorites = deserializeFavorites(p[KEY_FAVORITES].orEmpty()),
+            showSystem = p[KEY_SHOW_SYSTEM] ?: false,
             iconSizeDp = p[KEY_ICON] ?: DEFAULT_ICON_DP,
             fontSizeSp = p[KEY_FONT] ?: DEFAULT_FONT_SP,
             showIcons = p[KEY_SHOW_ICONS] ?: true,
@@ -141,6 +145,10 @@ class HomeStore(private val context: Context) {
     }
 
     /** 收藏/取消收藏:收藏的应用在抽屉"所有应用"中置顶。 */
+    suspend fun setShowSystem(value: Boolean) {
+        context.homeDataStore.edit { it[KEY_SHOW_SYSTEM] = value }
+    }
+
     suspend fun toggleFavorite(component: String, favorite: Boolean) {
         context.homeDataStore.edit {
             val cur = deserializeFavorites(it[KEY_FAVORITES].orEmpty()).toMutableSet()
@@ -245,6 +253,7 @@ class HomeStore(private val context: Context) {
             it[KEY_ENTRIES] = serialize(defaultEntries.take(MAX_APPS))
             it[KEY_MAX_APPS] = DEFAULT_MAX_APPS
             it[KEY_INIT] = true
+            it[KEY_SHOW_SYSTEM] = false
             it[KEY_ICON] = DEFAULT_ICON_DP
             it[KEY_FONT] = DEFAULT_FONT_SP
             it[KEY_SHOW_ICONS] = true

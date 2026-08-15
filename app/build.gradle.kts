@@ -12,13 +12,20 @@ android {
         applicationId = "com.mylauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.3.0"
     }
 
     buildTypes {
+        // 交付物极致瘦身:debug 与 release 都开启 R8 压缩 + 资源收缩
+        // (debug 保持 debuggable,数据备份迁移依赖 run-as)
+        debug {
+            isMinifyEnabled = true
+            isShrinkResources = true
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 

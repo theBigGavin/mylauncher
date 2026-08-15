@@ -15,6 +15,8 @@ fun PickerScreen(
     showOriginalColor: Boolean,
     wallpaperMode: String,
     adding: Boolean,
+    showSystem: Boolean,
+    onShowSystemChange: (Boolean) -> Unit,
     onPick: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -27,6 +29,8 @@ fun PickerScreen(
         showIcons = showIcons,
         showOriginalColor = showOriginalColor,
         wallpaperMode = wallpaperMode,
+        showSystem = showSystem,
+        onShowSystemChange = onShowSystemChange,
         onRowClick = onPick,
         onDismiss = onDismiss,
     )

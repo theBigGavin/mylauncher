@@ -75,13 +75,6 @@ import com.mylauncher.icons.rememberMonoIcon
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** 抽屉行左滑露出的文字操作。 */
-internal data class RowAction(
-    val label: String,
-    val onClick: (AppEntry) -> Unit,
-    val destructive: Boolean = false,
-)
-
 /** 应用抽屉:空白处上滑拉出;点击启动;行内左滑露出 放入桌面/删除/信息;点行首星标收藏(收藏置顶)。 */
 @Composable
 fun AppDrawer(
@@ -95,6 +88,8 @@ fun AppDrawer(
     customOffsetX: Float,
     customOffsetY: Float,
     favorites: Set<String>,
+    showSystem: Boolean,
+    onShowSystemChange: (Boolean) -> Unit,
     onLaunch: (AppEntry) -> Unit,
     onAddToHome: (AppEntry) -> Unit,
     onToggleFavorite: (AppEntry) -> Unit,
@@ -115,6 +110,8 @@ fun AppDrawer(
         customOffsetY = customOffsetY,
         favorites = favorites,
         onToggleFavorite = onToggleFavorite,
+        showSystem = showSystem,
+        onShowSystemChange = onShowSystemChange,
         rowActions = { entry ->
             // 应用分身只提供"放入桌面":删除/信息走的是主用户路径,对分身不适用
             if (entry.isMainUser) {
@@ -203,10 +200,11 @@ internal fun AppListOverlay(
     rowActions: ((AppEntry) -> List<RowAction>)? = null,
     favorites: Set<String> = emptySet(),
     onToggleFavorite: ((AppEntry) -> Unit)? = null,
+    showSystem: Boolean = false,
+    onShowSystemChange: (Boolean) -> Unit = {},
 ) {
     BackHandler(onBack = onDismiss)
-    // 默认不显示系统应用(无图标/无界面的已在仓库层过滤);用户可手动打开
-    var showSystem by remember { mutableStateOf(false) }
+    // 系统应用显示开关:初始值来自持久化设置,用户切换后回写(记住用户习惯)
     var query by remember { mutableStateOf("") }
     val visible = remember(apps, showSystem, query, favorites) {
         val base = if (showSystem) apps else apps.filter { !it.isSystem }
@@ -295,7 +293,7 @@ internal fun AppListOverlay(
                     ),
                 )
                 Spacer(Modifier.width(10.dp))
-                MiniSwitch(checked = showSystem, onChange = { showSystem = it })
+                MiniSwitch(checked = showSystem, onChange = { onShowSystemChange(it) })
             }
             Spacer(Modifier.height(16.dp))
 
@@ -373,7 +371,6 @@ internal fun AppListOverlay(
                         // 内容不位移(抽屉行内容靠左,左移会被裁出屏幕);按钮跟手 + 淡入 + 行背景反馈。
                         var revealed by remember { mutableStateOf(false) }
                         var dragProgress by remember { mutableStateOf(0f) } // 拖拽进度 0..1,驱动按钮跟手
-                        var pressed by remember { mutableStateOf(false) }   // 按压反馈
                         // 展开后无操作超时自动收起(点按钮/再滑右都会重置计时)
                         LaunchedEffect(revealed) {
                             if (revealed) {
@@ -387,7 +384,7 @@ internal fun AppListOverlay(
                         )
                         val rowBgAlpha by animateFloatAsState(
                             targetValue = if (revealed) 0.12f
-                            else if (pressed || dragProgress > 0f) 0.08f
+                            else if (dragProgress > 0f) 0.08f
                             else 0f,
                             label = "drawerRevealBg",
                         )
@@ -499,63 +496,37 @@ internal fun AppListOverlay(
                                     ),
                                 contentAlignment = Alignment.CenterStart,
                             ) {
-                                Row(
-                                    Modifier,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    val icon = if (showOriginalColor) {
+                                AppRow(
+                                    name = app.label,
+                                    icon = if (showOriginalColor) {
                                         rememberColorIcon(app, iconSize)
                                     } else {
                                         rememberMonoIcon(app, iconSize)
-                                    }
-                                    if (showIcons) {
-                                        IconBox(icon, iconSize, 0)
-                                        Spacer(Modifier.width(16.dp))
-                                    }
-                                    BasicText(
-                                        text = app.label,
-                                        style = TextStyle(
-                                            color = Color.White,
-                                            fontSize = fontSize,
-                                            fontWeight = FontWeight.Black,
-                                            letterSpacing = 0.5.sp,
-                                            lineHeight = fontSize * 1.1f,
-                                            shadow = textShadow,
-                                        ),
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                    )
-                                }
+                                    },
+                                    iconSize = iconSize,
+                                    fontSize = fontSize,
+                                    showIcons = showIcons,
+                                    landscape = config.screenWidthDp > config.screenHeightDp,
+                                )
                             }
                             // 右侧操作按钮:必须画在内容层之上(后绘 = 命中优先),
                             // 否则内容层 fillMaxSize 挡住按钮,点按永远落不到按钮上(修过的坑);
                             // 贴齐屏幕右缘,仅留少量右留白;不铺深色衬底:
                             // background 与 graphicsLayer 同链时 alpha 不生效(实测衬底常驻),
                             // 文字可读性靠 textShadow 保证
-                            Row(
-                                Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .height(rowHeight)
-                                    .padding(end = 12.dp)
-                                    .graphicsLayer {
-                                        alpha = buttonsAlpha
-                                        translationX = (1f - buttonsAlpha) * slidePx
-                                    },
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                currentActions.forEach { action ->
-                                    RevealButton(
-                                        label = action.label,
-                                        fg = if (action.destructive) Color(0xFFFF8A80) else Color.White,
-                                        enabled = revealed,
-                                        modifier = Modifier.width(actionWidth() / 3),
-                                        onClick = {
-                                            revealed = false
-                                            action.onClick(currentApp)
-                                        },
-                                    )
-                                }
-                            }
+                            RevealButtonBar(
+                                actions = currentActions,
+                                alpha = buttonsAlpha,
+                                slidePx = slidePx,
+                                rowHeight = rowHeight,
+                                enabled = revealed,
+                                buttonWidth = actionWidth() / 3,
+                                modifier = Modifier.padding(end = 12.dp),
+                                onAction = { action ->
+                                    revealed = false
+                                    action.onClick(currentApp)
+                                },
+                            )
                             // 收藏星标:行首固定、全程可见(展开时也不淡出),点按切换收藏(收藏在列表中置顶)
                             if (currentToggleFavorite != null) {
                                 Box(
