@@ -17,6 +17,7 @@ fun PickerScreen(
     adding: Boolean,
     showSystem: Boolean,
     onShowSystemChange: (Boolean) -> Unit,
+    favorites: Set<String>,
     onPick: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -31,6 +32,8 @@ fun PickerScreen(
         wallpaperMode = wallpaperMode,
         showSystem = showSystem,
         onShowSystemChange = onShowSystemChange,
+        // 收藏应用置顶 + 行首实心星标(与抽屉一致的收藏特性;非收藏不显示空星标)
+        favorites = favorites,
         onRowClick = onPick,
         onDismiss = onDismiss,
     )

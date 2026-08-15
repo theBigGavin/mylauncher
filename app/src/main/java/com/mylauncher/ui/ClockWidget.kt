@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -132,18 +133,22 @@ fun ClockWidget(
         if (meritBubbles.isNotEmpty()) {
             val clockPx = with(LocalDensity.current) { timeSize.sp.toPx() }
             meritBubbles.forEach { bubble ->
-                MeritBubble(
-                    bubble = bubble,
-                    clockFontSizePx = clockPx,
-                    areaW = maxWidth,
-                    // 从时间文字处冒泡,向屏幕顶端扩散
-                    anchorWindowX = timeAnchorX,
-                    anchorWindowY = timeAnchorY,
-                    rootWindowX = windowX,
-                    rootWindowY = windowY,
-                    onDone = { onMeritBubbleDone(bubble.id) },
-                    modifier = Modifier.align(Alignment.TopStart),
-                )
+                // 必须用 key 隔离:无 key 时前一个气泡完成后,后一个会复用其组合槽位
+                // (继承已完成的 Animatable),动画永不运行、onDone 永不触发 —— 气泡变成屏幕外透明态的僵尸
+                key(bubble.id) {
+                    MeritBubble(
+                        bubble = bubble,
+                        clockFontSizePx = clockPx,
+                        areaW = maxWidth,
+                        // 从时间文字处冒泡,向屏幕顶端扩散
+                        anchorWindowX = timeAnchorX,
+                        anchorWindowY = timeAnchorY,
+                        rootWindowX = windowX,
+                        rootWindowY = windowY,
+                        onDone = { onMeritBubbleDone(bubble.id) },
+                        modifier = Modifier.align(Alignment.TopStart),
+                    )
+                }
             }
         }
     }
@@ -165,19 +170,23 @@ private fun MeritBubble(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    // 字号固定为最终大小(时钟字号的 70%~90% 随机,定下后不再变);
-    // 动画只用 graphicsLayer 缩放整体放大,不修改字体大小
-    val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
-    val startScale = 0.30f + Random.nextFloat() * 0.30f // 初始缩放随机(0.3~0.6)
-    // 起始水平位置:时间文字中心附近(时钟中间 1/3 范围内随机)
-    val startXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
-    // 扩散方向:向上偏左/偏右的斜线(±25° 随机,选定后不变,不左右乱晃)
-    val angleDeg = (Random.nextFloat() * 2f - 1f) * 25f
-    val rad = Math.toRadians(angleDeg.toDouble())
-    val dirX = sin(rad).toFloat()
-    val dirY = -cos(rad).toFloat()
-    // 扩散距离:锚点(时间文字)到屏幕顶端的距离(随机比例),冒泡升到屏幕顶端附近
-    val dist = anchorWindowY * (0.8f + Random.nextFloat() * 0.4f)
+    // 随机参数必须 remember:组合期每次重算会让气泡在动画中途跳变(注释里"定下后不再变"的保证)
+    val randomSpec = remember {
+        // 字号固定为最终大小(时钟字号的 70%~90% 随机,定下后不再变);
+        // 动画只用 graphicsLayer 缩放整体放大,不修改字体大小
+        val endSize = clockFontSizePx * (0.70f + Random.nextFloat() * 0.20f)
+        val startScale = 0.30f + Random.nextFloat() * 0.30f // 初始缩放随机(0.3~0.6)
+        // 起始水平位置:时间文字中心附近(时钟中间 1/3 范围内随机)
+        val startXPx = (Random.nextFloat() * 2f - 1f) * with(density) { areaW.toPx() } / 6f
+        // 扩散方向:向上偏左/偏右的斜线(±25° 随机,选定后不变,不左右乱晃)
+        val angleDeg = (Random.nextFloat() * 2f - 1f) * 25f
+        val rad = Math.toRadians(angleDeg.toDouble())
+        val dirX = sin(rad).toFloat()
+        val dirY = -cos(rad).toFloat()
+        // 扩散距离:锚点(时间文字)到屏幕顶端的距离(随机比例),冒泡升到屏幕顶端附近
+        val dist = anchorWindowY * (0.8f + Random.nextFloat() * 0.4f)
+        BubbleSpec(endSize, startScale, startXPx, dirX, dirY, dist)
+    }
     val progress = remember { Animatable(0f) }
     // 贝塞尔曲线控制速度:快起慢收(冒泡感),运动平滑无抖动
     val bubbleEasing = CubicBezierEasing(0.0f, 0.45f, 0.25f, 1.0f)
@@ -194,9 +203,9 @@ private fun MeritBubble(
                 // 关键:progress 只在 layer 块内读取,不触发重组(否则文字每帧重排会闪烁)
                 val p = progress.value
                 // 锚点 = 时间文字顶部(减半宽使气泡水平居中于锚点),再沿选定方向扩散
-                translationX = (anchorWindowX - rootWindowX) + startXPx + dirX * dist * p - widthPx / 2f
-                translationY = (anchorWindowY - rootWindowY) + dirY * dist * p
-                val sc = startScale + (1f - startScale) * p
+                translationX = (anchorWindowX - rootWindowX) + randomSpec.startXPx + randomSpec.dirX * randomSpec.dist * p - widthPx / 2f
+                translationY = (anchorWindowY - rootWindowY) + randomSpec.dirY * randomSpec.dist * p
+                val sc = randomSpec.startScale + (1f - randomSpec.startScale) * p
                 scaleX = sc
                 scaleY = sc
                 this.alpha = 1f - p
@@ -209,10 +218,20 @@ private fun MeritBubble(
             text = "功德+${bubble.count}",
             style = TextStyle(
                 color = Color.White,
-                fontSize = with(density) { endSize.toSp() },
+                fontSize = with(density) { randomSpec.endSize.toSp() },
                 fontWeight = FontWeight.Black,
                 shadow = textShadow,
             ),
         )
     }
 }
+
+/** 气泡随机参数(remember 持有,动画全程不变)。 */
+private class BubbleSpec(
+    val endSize: Float,
+    val startScale: Float,
+    val startXPx: Float,
+    val dirX: Float,
+    val dirY: Float,
+    val dist: Float,
+)

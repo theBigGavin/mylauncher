@@ -550,6 +550,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             adding = req is PickerRequest.Add,
             showSystem = data.showSystem,
             onShowSystemChange = { scope.launch { store.setShowSystem(it) } },
+            favorites = data.favorites,
             onPick = { entry ->
                 when (req) {
                     is PickerRequest.Add -> scope.launch {

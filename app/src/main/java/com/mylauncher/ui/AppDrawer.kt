@@ -527,20 +527,29 @@ internal fun AppListOverlay(
                                     action.onClick(currentApp)
                                 },
                             )
-                            // 收藏星标:行首固定、全程可见(展开时也不淡出),点按切换收藏(收藏在列表中置顶)
-                            if (currentToggleFavorite != null) {
+                            // 收藏星标:行首固定、全程可见(展开时也不淡出)。
+                            // 抽屉行:有切换回调 → 显示星标(空/实)且可点按切换;
+                            // 选择器行:无切换回调 → 仅收藏的应用显示实心星标,非收藏不显示空星标
+                            val isFavorite = app.component in currentFavorites
+                            if (currentToggleFavorite != null || isFavorite) {
                                 Box(
                                     Modifier
                                         .align(Alignment.CenterStart)
                                         .padding(start = 16.dp)
                                         .size(34.dp)
-                                        .clickable {
-                                            currentToggleFavorite?.invoke(currentApp)
-                                        },
+                                        .then(
+                                            if (currentToggleFavorite != null) {
+                                                Modifier.clickable {
+                                                    currentToggleFavorite?.invoke(currentApp)
+                                                }
+                                            } else {
+                                                Modifier
+                                            }
+                                        ),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     FavoriteStar(
-                                        filled = app.component in currentFavorites,
+                                        filled = isFavorite,
                                         modifier = Modifier.size(16.dp),
                                     )
                                 }
