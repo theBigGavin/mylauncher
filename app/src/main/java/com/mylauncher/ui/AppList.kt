@@ -259,16 +259,21 @@ private fun AddRow(
     fontSize: TextUnit,
     showIcons: Boolean,
     landscape: Boolean,
+    /** 淡入开关:由列表在"滚动露出到位"后置 true,行才淡入 —— 与滚动错开,避免闪出。 */
+    visible: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 行自身缓进:出现时淡入(配合 animateItem 的展开,不再闪出)
-    val alpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(280)) }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(280),
+        label = "addRowAlpha",
+    )
     Row(
         modifier = modifier
-            .graphicsLayer { this.alpha = alpha.value }
-            .clickable(onClick = onClick),
+            .graphicsLayer { this.alpha = alpha }
+            // 隐藏期不挂 clickable:alpha 0 不影响命中,否则会吞掉该位置的点击
+            .then(if (visible) Modifier.clickable(onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (landscape) {
@@ -447,24 +452,14 @@ fun AppList(
     val scrollState = rememberLazyListState()
     // "添加应用"按钮:默认隐藏;列表为空时恒显;拖动列表(即使不产生滚动)时临时出现,
     // 超时自动隐藏 —— 点击已注册的拖动次数,每次拖动重置计时
-    var addShowTick by remember { mutableIntStateOf(0) }
-    val showAddRow = items.isEmpty() || addShowTick > 0
-    // 隐藏计时独立运行:任何滚动/拖拽异常都不影响 3s 自动收起
-    LaunchedEffect(addShowTick, items.isEmpty()) {
-        if (addShowTick > 0 && items.isNotEmpty()) {
+    // "添加应用"行常驻列表(槽位未满时),只做视觉显隐(alpha 淡入淡出),不插删 —— 布局稳定不跳。
+    // 拖动列表时显示;松手后重新计时,3s 无操作淡出;列表为空时恒显
+    var addRowShown by remember { mutableStateOf(items.isEmpty()) }
+    var addRowHideTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(addRowHideTick, items.isEmpty()) {
+        if (addRowShown && items.isNotEmpty()) {
             delay(3000)
-            addShowTick = 0
-        }
-    }
-    // 追加行露出:仅在行出现的那一次(showAddRow 翻转)平滑滚动到列表末尾;
-    // 先等滚动互斥锁释放(用户拖拽/松手 fling 期间动画会被打断或闪跳),空闲后再动画。
-    // 注意:不能跟着 tick 走 —— 每次拖动的松手都会 tick+1,列表会被反复拽回底部无法上滑
-    LaunchedEffect(showAddRow, items.size) {
-        if (showAddRow && items.isNotEmpty() && items.size < maxApps) {
-            while (scrollState.isScrollInProgress) {
-                delay(80)
-            }
-            runCatching { scrollState.animateScrollToItem(items.size) }
+            addRowShown = false
         }
     }
     LazyColumn(
@@ -484,13 +479,13 @@ fun AppList(
                                 abs(change.position.y - down.position.y) > viewConfiguration.touchSlop * 2f
                             ) {
                                 dragged = true
-                                addShowTick++
+                                addRowShown = true
                             }
                         }
                         if (up) {
-                            // 松手时重新计时:行在拖拽结束后才完整出现,3s 隐藏窗口从松手起算
+                            // 松手时重新计时:3s 隐藏窗口从松手起算
                             // (否则长拖拽结束时窗口已耗尽,行一闪而过看起来像"拉不出")
-                            if (dragged) addShowTick++
+                            if (dragged) addRowHideTick++
                             break
                         }
                     }
@@ -734,17 +729,16 @@ fun AppList(
             }
         }
 
-        if (showAddRow && items.size < maxApps) {
+        if (items.size < maxApps) {
             item(key = "__add__") {
                 AddRow(
                     iconSize = iconSize,
                     fontSize = fontSize,
                     showIcons = showIcons,
                     landscape = landscape,
+                    visible = addRowShown,
                     onClick = onAdd,
                     modifier = Modifier
-                        // 插入/移除随 animateItem 平滑展开/收起,列表不跳
-                        .animateItem()
                         .fillMaxWidth()
                         .height(rowHeight)
                         // 横屏与普通行一致用 12dp;竖屏用主屏行边距 PORTRAIT_ROW_MARGIN
