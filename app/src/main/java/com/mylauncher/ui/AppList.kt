@@ -442,6 +442,11 @@ fun AppList(
     val showAddRow = items.isEmpty() || addShowTick > 0
     LaunchedEffect(addShowTick, items.isEmpty()) {
         if (addShowTick > 0 && items.isNotEmpty()) {
+            // 列表已溢出时,"添加应用"行追加在视口外,用户看不到(竖屏常见):
+            // 滚动到底把它露出来;列表未满时不产生位移
+            if (items.size < maxApps) {
+                scrollState.animateScrollToItem(items.size)
+            }
             delay(3000)
             addShowTick = 0
         }

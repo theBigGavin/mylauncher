@@ -119,24 +119,7 @@ fun SettingsScreen(
     }
     val listenerEnabled = remember { isBadgeListenerEnabled(context) }
 
-    // 列表行距:离散档位 —— 按当前布局的可视高度反推行距,保证整行完整显示(不被边缘裁切)
-    val baseRowHeight = appRowHeight(iconSize.dp, fontSize.sp).value
-    val spacingOptions = remember(iconSize, fontSize, config.screenWidthDp, config.screenHeightDp) {
-        val h = config.screenHeightDp.toFloat()
-        val w = config.screenWidthDp.toFloat()
-        val listHeight = if (w > h) {
-            h - 96f // 横屏:列表上下各 48dp
-        } else {
-            // 竖屏:总高 - 顶部留白20% - 时钟(时间+日期) - 列表间距5% - 底部计数
-            val time = minOf(120f, w * 0.26f)
-            val date = (time * 0.32f).coerceIn(26f, 44f)
-            h - 0.20f * h - (time + 10f + date) - 0.05f * h - 90f
-        }
-        listOf(12, 10, 8, 6).mapNotNull { rows ->
-            val spacing = (listHeight / rows - baseRowHeight).roundToInt()
-            if (spacing in 0..48) rows to spacing else null
-        }
-    }
+    // 列表行距:连续滑条(与其它尺寸类设置一致),不再用离散档位
 
     Box(Modifier.fillMaxSize()) {
         GlassPageBackground(
@@ -178,6 +161,8 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
+                // 分组:外观 → 桌面 → 通知 → 彩蛋 → 其他(高频操作靠前,系统入口跟随其开关)
+                SettingSection("外观")
                 SettingRow("图标大小") {
                     MiniSlider(
                         value = iconSize.toFloat(),
@@ -192,6 +177,14 @@ fun SettingsScreen(
                         range = 18f..40f,
                         modifier = Modifier.width(150.dp),
                         onChange = { onFontSize(it.roundToInt()) },
+                    )
+                }
+                SettingRow("列表行距") {
+                    MiniSlider(
+                        value = rowSpacing.toFloat(),
+                        range = 0f..48f,
+                        modifier = Modifier.width(150.dp),
+                        onChange = { onRowSpacing(it.roundToInt()) },
                     )
                 }
                 SettingRow("列表高度(竖屏)") {
@@ -210,62 +203,11 @@ fun SettingsScreen(
                         onChange = { onListHeight(HomeStore.WALLPAPER_FORM_LANDSCAPE, it.roundToInt()) },
                     )
                 }
-                SettingRow("列表行距") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        spacingOptions.forEach { (rows, spacing) ->
-                            val selected = spacing == rowSpacing
-                            Box(
-                                Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (selected) Color.White else Color.White.copy(alpha = 0.15f))
-                                    .clickable { onRowSpacing(spacing) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                BasicText(
-                                    text = "${rows}行",
-                                    style = TextStyle(
-                                        color = if (selected) Color(0xFF1E1E22) else Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    ),
-                                )
-                            }
-                        }
-                    }
-                }
-                SettingRow("桌面槽位数") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BasicText(
-                            text = "$maxApps",
-                            style = TextStyle(
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 14.sp,
-                            ),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        MiniSlider(
-                            value = maxApps.toFloat(),
-                            range = HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
-                            modifier = Modifier.width(120.dp),
-                            onChange = { onMaxApps(it.roundToInt()) },
-                        )
-                    }
-                }
                 SettingRow("显示图标") {
                     MiniSwitch(checked = showIcons, onChange = onShowIcons)
                 }
                 SettingRow("图标原彩") {
                     MiniSwitch(checked = showOriginalColor, onChange = onShowOriginalColor)
-                }
-                SettingRow("功德彩蛋(边缘滑入)") {
-                    MiniSwitch(checked = easterEggEnabled, onChange = onEasterEgg)
-                }
-                SettingRow("木鱼音效") {
-                    MiniSwitch(checked = meritSoundEnabled, onChange = onMeritSound)
-                }
-                SettingRow("通知角标") {
-                    MiniSwitch(checked = showBadges, onChange = onShowBadges)
                 }
                 SettingRow("壁纸") {
                     BasicText(
@@ -285,6 +227,26 @@ fun SettingsScreen(
                     onClick = onPickSystemWallpaper,
                     strong = false,
                 )
+
+                SettingSection("桌面")
+                SettingRow("桌面槽位数") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BasicText(
+                            text = "$maxApps",
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                            ),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        MiniSlider(
+                            value = maxApps.toFloat(),
+                            range = HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
+                            modifier = Modifier.width(120.dp),
+                            onChange = { onMaxApps(it.roundToInt()) },
+                        )
+                    }
+                }
                 SettingRow("默认桌面") {
                     BasicText(
                         text = if (isDefaultLauncher) "已设为默认" else (defaultLabel ?: "未设置"),
@@ -292,19 +254,6 @@ fun SettingsScreen(
                             color = Color.White.copy(alpha = 0.6f),
                             fontSize = 14.sp,
                         ),
-                    )
-                }
-                if (showBadges && !listenerEnabled) {
-                    TextButton(
-                        text = "开启系统通知使用权(角标需要)",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                )
-                            }
-                        },
-                        strong = false,
                     )
                 }
                 if (!isDefaultLauncher) {
@@ -320,6 +269,34 @@ fun SettingsScreen(
                         strong = true,
                     )
                 }
+
+                SettingSection("通知")
+                SettingRow("通知角标") {
+                    MiniSwitch(checked = showBadges, onChange = onShowBadges)
+                }
+                if (showBadges && !listenerEnabled) {
+                    TextButton(
+                        text = "开启系统通知使用权(角标需要)",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                )
+                            }
+                        },
+                        strong = false,
+                    )
+                }
+
+                SettingSection("彩蛋")
+                SettingRow("功德彩蛋(边缘滑入)") {
+                    MiniSwitch(checked = easterEggEnabled, onChange = onEasterEgg)
+                }
+                SettingRow("木鱼音效") {
+                    MiniSwitch(checked = meritSoundEnabled, onChange = onMeritSound)
+                }
+
+                SettingSection("其他")
                 TextButton(
                     text = "恢复默认布局",
                     onClick = onReset,
@@ -427,6 +404,21 @@ private fun currentDefaultHome(context: Context): ComponentName? {
             ?.activityInfo
             ?.let { ComponentName(it.packageName, it.name) }
     }.getOrNull()
+}
+
+/** 设置分组标题:小号大写感标签,与抽屉副标题同一风格。 */
+@Composable
+private fun SettingSection(title: String) {
+    BasicText(
+        text = title,
+        modifier = Modifier.padding(top = 26.dp, bottom = 4.dp),
+        style = TextStyle(
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+        ),
+    )
 }
 
 /** 设置行:左对齐大字号标签 + 右侧控件(风格同桌面列表)。 */
