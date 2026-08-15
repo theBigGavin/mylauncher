@@ -135,9 +135,10 @@ fun SettingsScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                // 上滚避让系统状态栏:滚动区顶在状态栏之下,内容不会被状态栏压住
+                // 顶部安全区:滚动容器整体压在状态栏之下,滚动内容在容器上缘被裁剪,
+                // 不会穿过系统状态栏(状态栏留白透出壁纸)
                 .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
                 // 与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN),不再用更宽的 80dp
                 .padding(start = PORTRAIT_ROW_MARGIN, end = PORTRAIT_ROW_MARGIN, bottom = 80.dp)
         ) {
@@ -169,68 +170,35 @@ fun SettingsScreen(
                 // 分组:外观 → 桌面 → 通知 → 彩蛋 → 其他(高频操作靠前,系统入口跟随其开关)
                 SettingSection("外观")
                 SettingRow("图标大小") {
-                    MiniSlider(
-                        value = iconSize.toFloat(),
-                        range = 24f..56f,
-                        modifier = Modifier.width(150.dp),
-                        onChange = { onIconSize((it / 2).roundToInt() * 2) },
-                    )
+                    SliderSetting(iconSize, 24f..56f) { onIconSize(it / 2 * 2) }
                 }
                 SettingRow("字体大小") {
-                    MiniSlider(
-                        value = fontSize.toFloat(),
-                        range = 18f..40f,
-                        modifier = Modifier.width(150.dp),
-                        onChange = { onFontSize(it.roundToInt()) },
-                    )
+                    SliderSetting(fontSize, 18f..40f) { onFontSize(it) }
                 }
                 SettingRow("列表行距") {
-                    MiniSlider(
-                        value = rowSpacing.toFloat(),
-                        range = 0f..10f,
-                        modifier = Modifier.width(150.dp),
-                        onChange = { onRowSpacing(it.roundToInt()) },
-                    )
+                    SliderSetting(rowSpacing, 0f..10f) { onRowSpacing(it) }
                 }
                 SettingRow("列表高度(竖屏)") {
-                    MiniSlider(
-                        value = listHeightPercent.toFloat(),
-                        range = 25f..55f,
-                        modifier = Modifier.width(150.dp),
-                        onChange = { onListHeight(HomeStore.WALLPAPER_FORM_PORTRAIT, it.roundToInt()) },
-                    )
+                    SliderSetting(listHeightPercent, 25f..55f) {
+                        onListHeight(HomeStore.WALLPAPER_FORM_PORTRAIT, it)
+                    }
                 }
                 SettingRow("列表高度(横屏)") {
-                    MiniSlider(
-                        value = listHeightPercentLandscape.toFloat(),
-                        range = 25f..100f,
-                        modifier = Modifier.width(150.dp),
-                        onChange = { onListHeight(HomeStore.WALLPAPER_FORM_LANDSCAPE, it.roundToInt()) },
-                    )
+                    SliderSetting(listHeightPercentLandscape, 25f..100f) {
+                        onListHeight(HomeStore.WALLPAPER_FORM_LANDSCAPE, it)
+                    }
+                }
+                SettingRow("桌面槽位数") {
+                    SliderSetting(
+                        maxApps,
+                        HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
+                    ) { onMaxApps(it) }
                 }
                 SettingRow("显示图标") {
                     MiniSwitch(checked = showIcons, onChange = onShowIcons)
                 }
                 SettingRow("图标原彩") {
                     MiniSwitch(checked = showOriginalColor, onChange = onShowOriginalColor)
-                }
-                SettingRow("桌面槽位数") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BasicText(
-                            text = "$maxApps",
-                            style = TextStyle(
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 14.sp,
-                            ),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        MiniSlider(
-                            value = maxApps.toFloat(),
-                            range = HomeStore.MIN_MAX_APPS.toFloat()..HomeStore.MAX_APPS.toFloat(),
-                            modifier = Modifier.width(120.dp),
-                            onChange = { onMaxApps(it.roundToInt()) },
-                        )
-                    }
                 }
                 SettingRow("壁纸") {
                     BasicText(
@@ -435,6 +403,31 @@ private fun SettingSection(title: String) {
             letterSpacing = 2.sp,
         ),
     )
+}
+
+/** 滑条设置行内容:当前值文本 + 滑条 —— 所有滑条统一显示配置值(与桌面槽位数一致)。 */
+@Composable
+private fun SliderSetting(
+    value: Int,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Int) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BasicText(
+            text = "$value",
+            style = TextStyle(
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+            ),
+        )
+        Spacer(Modifier.width(10.dp))
+        MiniSlider(
+            value = value.toFloat(),
+            range = range,
+            modifier = Modifier.width(120.dp),
+            onChange = { onChange(it.roundToInt()) },
+        )
+    }
 }
 
 /** 设置行:左对齐大字号标签 + 右侧控件(风格同桌面列表)。 */

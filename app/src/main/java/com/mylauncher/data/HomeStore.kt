@@ -1,6 +1,7 @@
 package com.mylauncher.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
@@ -31,9 +32,11 @@ data class HomeData(
     val showBadges: Boolean,
     /** 图标是否显示原彩(否则单色化白剪影)。 */
     val showOriginalColor: Boolean,
-    /** 功德彩蛋:当日累计计数 + 日期(隔日清零)。 */
+    /** 功德彩蛋:当日累计计数(取自按日历史)。 */
     val meritCount: Int,
     val meritDate: String,
+    /** 功德按日历史(日期 → 当日计数,保留最近 365 天)。 */
+    val meritHistory: Map<String, Int>,
     val easterEggEnabled: Boolean,
     /** 彩蛋是否已解锁(设置页连点版本号 5 次激活,激活后才显示彩蛋设置分组)。 */
     val easterEggUnlocked: Boolean,
@@ -86,8 +89,13 @@ class HomeStore(private val context: Context) {
         private val KEY_SHOW_COLOR = booleanPreferencesKey("show_original_color")
         private val KEY_MERIT_COUNT = intPreferencesKey("merit_count")
         private val KEY_MERIT_DATE = stringPreferencesKey("merit_date")
+        /** 功德按日历史(每行 "日期 计数",保留最近 365 天)——总功德/每日统计的数据基础。 */
+        private val KEY_MERIT_HISTORY = stringPreferencesKey("merit_history")
+        private const val MERIT_HISTORY_DAYS = 365
         private val KEY_EASTER_EGG = booleanPreferencesKey("easter_egg_enabled")
         private val KEY_EASTER_UNLOCKED = booleanPreferencesKey("easter_egg_unlocked")
+        /** 数据 schema 版本:存量数据一次性迁移的标记。 */
+        private val KEY_SCHEMA = intPreferencesKey("schema_version")
         private val KEY_MERIT_SOUND = booleanPreferencesKey("merit_sound_enabled")
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
         private val KEY_LIST_HEIGHT = intPreferencesKey("list_height_percent")
@@ -104,6 +112,7 @@ class HomeStore(private val context: Context) {
     }
 
     val data: Flow<HomeData> = context.homeDataStore.data.map { p ->
+        val merit = meritFrom(p)
         HomeData(
             initialized = p[KEY_INIT] ?: false,
             entries = deserialize(p[KEY_ENTRIES].orEmpty()),
@@ -116,8 +125,9 @@ class HomeStore(private val context: Context) {
             rowSpacingDp = p[KEY_ROW_SPACING] ?: DEFAULT_ROW_SPACING_DP,
             showBadges = p[KEY_SHOW_BADGES] ?: true,
             showOriginalColor = p[KEY_SHOW_COLOR] ?: false,
-            meritCount = p[KEY_MERIT_COUNT] ?: 0,
-            meritDate = p[KEY_MERIT_DATE] ?: "",
+            meritCount = merit.count,
+            meritDate = merit.date,
+            meritHistory = merit.history,
             easterEggEnabled = p[KEY_EASTER_EGG] ?: false,
             easterEggUnlocked = p[KEY_EASTER_UNLOCKED] ?: false,
             meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
@@ -185,16 +195,25 @@ class HomeStore(private val context: Context) {
         context.homeDataStore.edit { it[KEY_SHOW_COLOR] = value }
     }
 
-    /** 功德 +1:当日累计,隔日清零。 */
+    /** 功德 +1:写入按日历史(保留最近 365 天),总功德/每日统计直接汇总此表。 */
     suspend fun addMerit() {
         val today = java.time.LocalDate.now().toString()
         context.homeDataStore.edit {
-            if (it[KEY_MERIT_DATE] != today) {
-                it[KEY_MERIT_DATE] = today
-                it[KEY_MERIT_COUNT] = 1
-            } else {
-                it[KEY_MERIT_COUNT] = (it[KEY_MERIT_COUNT] ?: 0) + 1
+            val hist = deserializeMeritHistory(it[KEY_MERIT_HISTORY].orEmpty()).toMutableMap()
+            if (hist.isEmpty()) {
+                // 旧格式迁移:首次写入时把 merit_date/merit_count 并入历史
+                val oldDate = it[KEY_MERIT_DATE]
+                val oldCount = it[KEY_MERIT_COUNT] ?: 0
+                if (oldDate != null && oldCount > 0) hist[oldDate] = oldCount
             }
+            hist[today] = (hist[today] ?: 0) + 1
+            it[KEY_MERIT_HISTORY] = hist.toSortedMap()
+                .entries
+                .toList()
+                .takeLast(MERIT_HISTORY_DAYS)
+                .joinToString("\n") { (d, c) -> "$d $c" }
+            it.remove(KEY_MERIT_DATE)
+            it.remove(KEY_MERIT_COUNT)
         }
     }
 
@@ -205,6 +224,22 @@ class HomeStore(private val context: Context) {
     /** 解锁彩蛋(设置页连点版本号 5 次):解锁后显示彩蛋设置分组。 */
     suspend fun setEasterEggUnlocked() {
         context.homeDataStore.edit { it[KEY_EASTER_UNLOCKED] = true }
+    }
+
+    /**
+     * 存量数据一次性迁移(每次启动调用,幂等):
+     * v1.3.1 及更早的版本没有"解锁"概念,彩蛋菜单常显 —— 那时的用户升级上来,
+     * 菜单应保持可见,否则像"激活状态丢了"。新装/恢复默认不受影响(无初始化数据/解锁键已存在)。
+     */
+    suspend fun applyLegacyMigrations() {
+        context.homeDataStore.edit {
+            if (it[KEY_SCHEMA] == null) {
+                if (it[KEY_INIT] == true && it[KEY_EASTER_UNLOCKED] == null) {
+                    it[KEY_EASTER_UNLOCKED] = true
+                }
+                it[KEY_SCHEMA] = 1
+            }
+        }
     }
 
     suspend fun setMeritSoundEnabled(value: Boolean) {
@@ -272,7 +307,9 @@ class HomeStore(private val context: Context) {
             it[KEY_EASTER_EGG] = false
             it[KEY_EASTER_UNLOCKED] = false
             it[KEY_MERIT_SOUND] = true
-            it[KEY_MERIT_COUNT] = 0
+            it[KEY_MERIT_HISTORY] = ""
+            it.remove(KEY_MERIT_DATE)
+            it.remove(KEY_MERIT_COUNT)
             it[KEY_WALLPAPER] = WALLPAPER_BUILTIN
         }
     }
@@ -296,4 +333,27 @@ class HomeStore(private val context: Context) {
 
     private fun deserializeFavorites(raw: String): Set<String> =
         raw.split("\n").filter { it.isNotBlank() }.toSet()
+
+    private fun deserializeMeritHistory(raw: String): Map<String, Int> =
+        raw.split("\n").mapNotNull { line ->
+            val parts = line.trim().split(" ", limit = 2)
+            parts.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { date ->
+                val count = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                if (count > 0) date to count else null
+            }
+        }.toMap()
+
+    /** 功德读数:按日历史 + 旧格式(merit_date/merit_count)迁移兼容。 */
+    private fun meritFrom(p: Preferences): MeritState {
+        val history = deserializeMeritHistory(p[KEY_MERIT_HISTORY].orEmpty())
+        val today = java.time.LocalDate.now().toString()
+        val merged = if (history.isEmpty()) {
+            val oldDate = p[KEY_MERIT_DATE]
+            val oldCount = p[KEY_MERIT_COUNT] ?: 0
+            if (oldDate != null && oldCount > 0) mapOf(oldDate to oldCount) else emptyMap()
+        } else history
+        return MeritState(count = merged[today] ?: 0, date = today, history = merged)
+    }
+
+    private data class MeritState(val count: Int, val date: String, val history: Map<String, Int>)
 }

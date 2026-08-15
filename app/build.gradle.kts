@@ -12,6 +12,9 @@ val releaseProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
+// debug 与 release 同签(release 密钥库可用时):两种构建可互相覆盖安装,
+// 不再因签名不同被迫卸载 —— 卸载会清空 DataStore(彩蛋解锁/功德/收藏等设置)
+val sharedSigning = if (releaseProps.isNotEmpty()) "release" else "debug"
 
 android {
     namespace = "com.mylauncher"
@@ -21,8 +24,8 @@ android {
         applicationId = "com.mylauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "1.4.2"
+        versionCode = 18
+        versionName = "1.5.0"
     }
 
     signingConfigs {
@@ -42,15 +45,12 @@ android {
         debug {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName(sharedSigning)
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = if (releaseProps.isNotEmpty()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName(sharedSigning)
         }
     }
 

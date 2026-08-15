@@ -15,7 +15,7 @@ MyLauncher — Zune/Metro 风格的 Android 桌面(注册为系统 HOME)。竖�
 - 安装:`adb install -r app/build/outputs/apk/debug/app-debug.apk`
 - 项目**没有测试**和 lint 配置,无 test source set。
 - **版本制度**:versionName 用语义化三段 `主.次.补丁`(新功能=次+1、纯修复=补丁+1);versionCode 单调 +1(本次 1.3.1 / code 6)。每次对外交付(含功能批次)必须在同一次提交里升版本号——用户会依据版本号判断是否已更新,漏升视为 bug。
-- **发版流程**:`./gradlew :app:assembleRelease` → `git tag vX.Y.Z && git push origin main vX.Y.Z` → `gh release create vX.Y.Z app/build/outputs/apk/release/app-release.apk --repo theBigGavin/mylauncher --title "MyLauncher vX.Y.Z" --notes "..."`(附安装说明:release 与 debug 签名不同,首次切换需卸载)。发布签名:密钥库在仓库外 `~/.android/mylauncher-keys/mylauncher-release.jks`,凭据在 gitignored 的 `keystore.properties`,缺失时 release 回退 debug 签名。
+- **发版流程**:`./gradlew :app:assembleRelease` → `git tag vX.Y.Z && git push origin main vX.Y.Z` → `gh release create vX.Y.Z app/build/outputs/apk/release/app-release.apk --repo theBigGavin/mylauncher --title "MyLauncher vX.Y.Z" --notes "..."`。发布签名:密钥库在仓库外 `~/.android/mylauncher-keys/mylauncher-release.jks`,凭据在 gitignored 的 `keystore.properties`;**debug 与 release 同签(密钥库可用时),可互相覆盖安装不丢数据**;缺失时两者均回退 debug 签名。注意:2026-08 之前的旧 debug 包是 debug 签名,升级到同签包需卸载一次(数据需备份迁移)。
 - 设计工具链:`design/render_mockup.py`(PIL 渲染效果图,依赖 Python + Pillow);`design/mockup.html` 为可交互原型,浏览器直接打开。
 
 ## 架构
@@ -34,7 +34,7 @@ MyLauncher — Zune/Metro 风格的 Android 桌面(注册为系统 HOME)。竖�
   - `Controls.kt`:共享自绘控件 `MiniSlider` / `MiniSwitch`(白色系,壁纸深底风格)。
   - `Wallpaper`:生成式 Canvas 壁纸(62° 硬边斜带 + -24° 细线 + 右上圆环)。**色板 `BANDS` 与 `mockup.html` / `render_mockup.py` 完全一致,改色必须三处同步**。
   - `ClockWidget` / `RenameDialog` / `SettingsScreen`:各自独立的浮层组件;Popup 一律手写 `PopupPositionProvider` 定位。`SettingsScreen` 是全屏设置页(长按空白打开),**Zune 扁平风格:左对齐大字号,白字直接铺在壁纸上**,含"设为默认桌面"(打开系统 `Settings.ACTION_HOME_SETTINGS` 页面——RoleManager 角色对话框在部分国产 ROM 上读不到 extra 会闪退,ACTION_CHOOSER 不持久化,只有系统设置页能真正改默认;状态在 ON_RESUME 时重新检测,见 LifecycleEventObserver)、`currentDefaultHome` 检测(必须用 resolveActivity,queryIntentActivities 返回全部候选无法判断默认)、通知角标开关 + 通知使用权入口。
-  - 功德木鱼(`HomeScreen` 边缘按下即 `knockNow` 放音 + 返回手势完成时功德+1/冒泡):**声音去重按手势不按全局时长**——`KnockSound.play` 每次先 stop 上一流再从头播(连击拟真,不叠加拖尾);边缘按下记录 `lastEdgeKnockMs`,返回完成回调 1s 内不再重复放音(同一手势两条触发路径去重);快速连击每次手势都响。冒泡各自独立 Animatable,天然并发。
+  - 功德木鱼(`HomeScreen` 边缘按下即 `knockNow` 放音 + 返回手势完成时功德+1/冒泡;功德按日持久化在 HomeStore `merit_history`,保留 365 天,总功德/每日统计直接汇总此表):**声音去重按手势不按全局时长**——`KnockSound.play` 每次先 stop 上一流再从头播(连击拟真,不叠加拖尾);边缘按下记录 `lastEdgeKnockMs`,返回完成回调 1s 内不再重复放音(同一手势两条触发路径去重);快速连击每次手势都响。冒泡各自独立 Animatable,天然并发。
   - `badges/BadgeService.kt`:`NotificationListenerService` 统计各包通知数 → `BadgeStore.counts`(StateFlow)。manifest 里注册了 service + POST_NOTIFICATIONS;需用户在系统"通知使用权"中授权(设置页有入口 + `isBadgeListenerEnabled` 检测)。
 
 ## 关键约定

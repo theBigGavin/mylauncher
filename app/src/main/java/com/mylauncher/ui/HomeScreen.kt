@@ -130,10 +130,13 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val apps = allApps
     val data = homeData
 
-    // 首次启动:默认加载常用应用
+    // 每次启动先跑存量数据迁移(幂等,见 applyLegacyMigrations);首次启动加载默认应用
     LaunchedEffect(apps, data?.initialized) {
-        if (apps != null && data != null && !data.initialized && apps.isNotEmpty()) {
-            store.setEntries(DefaultApps.pick(apps).map { StoredEntry(it.component, null) })
+        if (apps != null && data != null) {
+            store.applyLegacyMigrations()
+            if (!data.initialized && apps.isNotEmpty()) {
+                store.setEntries(DefaultApps.pick(apps).map { StoredEntry(it.component, null) })
+            }
         }
     }
 
