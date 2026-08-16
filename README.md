@@ -2,6 +2,8 @@
 
 Zune / Metro 风格的 Android 第三方桌面:白底撞色锐利壁纸、超大细体时钟、单色化图标 + 超粗 App 名称竖排列表,竖屏横屏自适应。
 
+🏠 **Made by Gavin's Lab** — a one-person company run by 7 AI agents on a kanban board: [company site](https://www.hermes.cc.cd) · [live transparency office](https://www.hermes.cc.cd/opc/)
+
 ## 功能
 
 - 注册为系统 Launcher(HOME),`fullUser` 方向,竖横屏自适应布局
