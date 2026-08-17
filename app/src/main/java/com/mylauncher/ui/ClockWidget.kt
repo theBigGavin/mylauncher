@@ -129,25 +129,35 @@ fun ClockWidget(
                 ),
             )
         }
-        // 功德气泡层:绝对定位 + graphicsLayer 动画,不影响布局、不闪烁
+        // 功德气泡层:matchParentSize 让整层铺满时钟可用区域但「不参与根 Box 测量」——
+        // 气泡文字(「功德+N」)有真实测量尺寸,graphicsLayer 缩放只是绘制变换不改变测量;
+        // 旧实现直接把气泡作为根 Box 子项(align(TopStart) 只影响放置、不影响测量),
+        // 冒泡一出现就把 wrap-content 的根 Box 撑大:竖屏 Column 里 ClockWidget 变高直接
+        // 推挤下方 AppList,横屏 BottomStart 对齐下根 Box 变高顶动时钟位置。
+        // matchParentSize 的子项用父级约束测量、尺寸不贡献给父容器,冒泡对布局零影响。
         if (meritBubbles.isNotEmpty()) {
             val clockPx = with(LocalDensity.current) { timeSize.sp.toPx() }
-            meritBubbles.forEach { bubble ->
-                // 必须用 key 隔离:无 key 时前一个气泡完成后,后一个会复用其组合槽位
-                // (继承已完成的 Animatable),动画永不运行、onDone 永不触发 —— 气泡变成屏幕外透明态的僵尸
-                key(bubble.id) {
-                    MeritBubble(
-                        bubble = bubble,
-                        clockFontSizePx = clockPx,
-                        areaW = maxWidth,
-                        // 从时间文字处冒泡,向屏幕顶端扩散
-                        anchorWindowX = timeAnchorX,
-                        anchorWindowY = timeAnchorY,
-                        rootWindowX = windowX,
-                        rootWindowY = windowY,
-                        onDone = { onMeritBubbleDone(bubble.id) },
-                        modifier = Modifier.align(Alignment.TopStart),
-                    )
+            // 内层 Box 的 lambda 接收者是 BoxScope,解析不到外层 BoxWithConstraintsScope 的
+            // maxWidth,这里提前捕获成局部变量(内层只依赖局部量,不依赖外层隐式接收者)
+            val bubbleAreaW = maxWidth
+            Box(Modifier.matchParentSize()) {
+                meritBubbles.forEach { bubble ->
+                    // 必须用 key 隔离:无 key 时前一个气泡完成后,后一个会复用其组合槽位
+                    // (继承已完成的 Animatable),动画永不运行、onDone 永不触发 —— 气泡变成屏幕外透明态的僵尸
+                    key(bubble.id) {
+                        MeritBubble(
+                            bubble = bubble,
+                            clockFontSizePx = clockPx,
+                            areaW = bubbleAreaW,
+                            // 从时间文字处冒泡,向屏幕顶端扩散
+                            anchorWindowX = timeAnchorX,
+                            anchorWindowY = timeAnchorY,
+                            rootWindowX = windowX,
+                            rootWindowY = windowY,
+                            onDone = { onMeritBubbleDone(bubble.id) },
+                            modifier = Modifier.align(Alignment.TopStart),
+                        )
+                    }
                 }
             }
         }
