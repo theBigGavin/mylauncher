@@ -14,7 +14,7 @@ MyLauncher — Zune/Metro 风格的 Android 桌面(注册为系统 HOME)。竖�
 - 构建:`./gradlew :app:assembleDebug`
 - 安装:`adb install -r app/build/outputs/apk/debug/app-debug.apk`
 - 项目**没有测试**和 lint 配置,无 test source set。
-- **版本制度**:versionName 用语义化三段 `主.次.补丁`(新功能=次+1、纯修复=补丁+1);versionCode 单调 +1(本次 1.3.1 / code 6)。每次对外交付(含功能批次)必须在同一次提交里升版本号——用户会依据版本号判断是否已更新,漏升视为 bug。
+- **版本制度**:versionName 用语义化三段 `主.次.补丁`(新功能=次+1、纯修复=补丁+1);versionCode 单调 +1(本次 1.5.3 / code 21)。每次对外交付(含功能批次)必须在同一次提交里升版本号——用户会依据版本号判断是否已更新,漏升视为 bug。
 - **发版流程**:`./gradlew :app:assembleRelease` → `git tag vX.Y.Z && git push origin main vX.Y.Z` → `gh release create vX.Y.Z app/build/outputs/apk/release/app-release.apk --repo theBigGavin/mylauncher --title "MyLauncher vX.Y.Z" --notes "..."`。发布签名:密钥库在仓库外 `~/.android/mylauncher-keys/mylauncher-release.jks`,凭据在 gitignored 的 `keystore.properties`;**debug 与 release 同签(密钥库可用时),可互相覆盖安装不丢数据**;缺失时两者均回退 debug 签名。注意:2026-08 之前的旧 debug 包是 debug 签名,升级到同签包需卸载一次(数据需备份迁移)。
 - 设计工具链:`design/render_mockup.py`(PIL 渲染效果图,依赖 Python + Pillow);`design/mockup.html` 为可交互原型,浏览器直接打开。
 
