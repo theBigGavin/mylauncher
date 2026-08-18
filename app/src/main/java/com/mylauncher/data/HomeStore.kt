@@ -41,6 +41,12 @@ data class HomeData(
     /** 彩蛋是否已解锁(设置页连点版本号 5 次激活,激活后才显示彩蛋设置分组)。 */
     val easterEggUnlocked: Boolean,
     val meritSoundEnabled: Boolean,
+    /** 功德文字(冒泡显示"文字+N",默认"功德",用户可自定义)。 */
+    val meritLabel: String,
+    /** 自动积累功德开关。 */
+    val autoMeritEnabled: Boolean,
+    /** 自动积累间隔(秒,10..600)。 */
+    val autoMeritIntervalS: Int,
     val wallpaperMode: String,
     /** 桌面列表视口高度(占屏高百分比,横竖屏分开配置)。 */
     val listHeightPercent: Int,
@@ -97,6 +103,14 @@ class HomeStore(private val context: Context) {
         /** 数据 schema 版本:存量数据一次性迁移的标记。 */
         private val KEY_SCHEMA = intPreferencesKey("schema_version")
         private val KEY_MERIT_SOUND = booleanPreferencesKey("merit_sound_enabled")
+        private val KEY_MERIT_LABEL = stringPreferencesKey("merit_label")
+        private val KEY_AUTO_MERIT = booleanPreferencesKey("auto_merit_enabled")
+        private val KEY_AUTO_MERIT_INTERVAL = intPreferencesKey("auto_merit_interval_s")
+
+        const val DEFAULT_MERIT_LABEL = "功德"
+        const val DEFAULT_AUTO_MERIT_INTERVAL_S = 10
+        const val MIN_AUTO_MERIT_INTERVAL_S = 10
+        const val MAX_AUTO_MERIT_INTERVAL_S = 600
         private val KEY_WALLPAPER = stringPreferencesKey("wallpaper_mode")
         private val KEY_LIST_HEIGHT = intPreferencesKey("list_height_percent")
         private val KEY_LIST_HEIGHT_LS = intPreferencesKey("list_height_percent_ls")
@@ -131,6 +145,9 @@ class HomeStore(private val context: Context) {
             easterEggEnabled = p[KEY_EASTER_EGG] ?: false,
             easterEggUnlocked = p[KEY_EASTER_UNLOCKED] ?: false,
             meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
+            meritLabel = p[KEY_MERIT_LABEL]?.takeIf { it.isNotBlank() } ?: DEFAULT_MERIT_LABEL,
+            autoMeritEnabled = p[KEY_AUTO_MERIT] ?: false,
+            autoMeritIntervalS = p[KEY_AUTO_MERIT_INTERVAL] ?: DEFAULT_AUTO_MERIT_INTERVAL_S,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
             listHeightPercent = p[KEY_LIST_HEIGHT] ?: DEFAULT_LIST_HEIGHT_PERCENT,
             listHeightPercentLandscape = p[KEY_LIST_HEIGHT_LS] ?: 100,
@@ -246,6 +263,21 @@ class HomeStore(private val context: Context) {
         context.homeDataStore.edit { it[KEY_MERIT_SOUND] = value }
     }
 
+    /** 自定义功德文字:存原文(允许编辑中短暂空白),读取侧空白回退默认"功德"。 */
+    suspend fun setMeritLabel(value: String) {
+        context.homeDataStore.edit { it[KEY_MERIT_LABEL] = value.trim() }
+    }
+
+    suspend fun setAutoMeritEnabled(value: Boolean) {
+        context.homeDataStore.edit { it[KEY_AUTO_MERIT] = value }
+    }
+
+    suspend fun setAutoMeritIntervalS(value: Int) {
+        context.homeDataStore.edit {
+            it[KEY_AUTO_MERIT_INTERVAL] = value.coerceIn(MIN_AUTO_MERIT_INTERVAL_S, MAX_AUTO_MERIT_INTERVAL_S)
+        }
+    }
+
     suspend fun setListHeightPercent(form: String, value: Int) {
         val v = value.coerceIn(25, 100)
         context.homeDataStore.edit {
@@ -307,6 +339,9 @@ class HomeStore(private val context: Context) {
             it[KEY_EASTER_EGG] = false
             it[KEY_EASTER_UNLOCKED] = false
             it[KEY_MERIT_SOUND] = true
+            it[KEY_MERIT_LABEL] = DEFAULT_MERIT_LABEL
+            it[KEY_AUTO_MERIT] = false
+            it[KEY_AUTO_MERIT_INTERVAL] = DEFAULT_AUTO_MERIT_INTERVAL_S
             it[KEY_MERIT_HISTORY] = ""
             it.remove(KEY_MERIT_DATE)
             it.remove(KEY_MERIT_COUNT)

@@ -11,6 +11,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalConfiguration
@@ -80,6 +84,9 @@ fun SettingsScreen(
     easterEggEnabled: Boolean,
     easterEggUnlocked: Boolean,
     meritSoundEnabled: Boolean,
+    meritLabel: String,
+    autoMeritEnabled: Boolean,
+    autoMeritIntervalS: Int,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
@@ -90,6 +97,9 @@ fun SettingsScreen(
     onEasterEgg: (Boolean) -> Unit,
     onUnlockEasterEgg: () -> Unit,
     onMeritSound: (Boolean) -> Unit,
+    onMeritLabel: (String) -> Unit,
+    onAutoMeritEnabled: (Boolean) -> Unit,
+    onAutoMeritIntervalS: (Int) -> Unit,
     onPickSystemWallpaper: () -> Unit,
     onListHeight: (form: String, value: Int) -> Unit,
     onReset: () -> Unit,
@@ -225,11 +235,52 @@ fun SettingsScreen(
                 // 彩蛋设置分组:默认隐藏,连点页脚版本号 5 次解锁后才显示
                 if (easterEggUnlocked) {
                     SettingSection("彩蛋")
-                    SettingRow("功德彩蛋(边缘滑入)") {
+                    SettingRow("功德彩蛋") {
                         MiniSwitch(checked = easterEggEnabled, onChange = onEasterEgg)
                     }
-                    SettingRow("木鱼音效") {
+                    SettingRow("敲击音效") {
                         MiniSwitch(checked = meritSoundEnabled, onChange = onMeritSound)
+                    }
+                    // 自定义功德文字:冒泡显示"文字+N",清空后冒泡回退默认"功德"。
+                    // 本地编辑态:允许编辑中短暂空白(直接绑定读取值会在删空瞬间被默认值回填,删不干净)
+                    var labelText by remember(meritLabel) { mutableStateOf(meritLabel) }
+                    SettingRow("功德文字") {
+                        Box(
+                            Modifier
+                                .width(160.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White.copy(alpha = 0.10f))
+                                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            BasicTextField(
+                                value = labelText,
+                                onValueChange = {
+                                    labelText = it.take(6)
+                                    onMeritLabel(labelText)
+                                },
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Light,
+                                    letterSpacing = 1.sp,
+                                ),
+                                cursorBrush = SolidColor(Color.White),
+                            )
+                        }
+                    }
+                    SettingRow("自动积累功德") {
+                        MiniSwitch(checked = autoMeritEnabled, onChange = onAutoMeritEnabled)
+                    }
+                    if (autoMeritEnabled) {
+                        SettingRow("自动积累间隔(秒)") {
+                            SliderSetting(
+                                autoMeritIntervalS,
+                                HomeStore.MIN_AUTO_MERIT_INTERVAL_S.toFloat()..
+                                    HomeStore.MAX_AUTO_MERIT_INTERVAL_S.toFloat(),
+                            ) { onAutoMeritIntervalS(it) }
+                        }
                     }
                 }
 

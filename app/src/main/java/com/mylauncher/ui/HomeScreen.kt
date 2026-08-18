@@ -215,6 +215,14 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     // 最近一次返回路径补敲的时刻:系统对同一手势双调回调时,两次 emit 间隔 <100ms,
     // 只响第一声(真实快速连按 >100ms 的独立手势不受影响)
     var lastBackKnockMs by remember { mutableLongStateOf(0L) }
+    // 功德 +1 + 冒泡(敲击/补敲/自动积累共用);冒泡文字用自定义功德文字
+    fun grantMerit() {
+        val d = currentData
+        scope.launch { store.addMerit() }
+        meritSeq++
+        meritBubbles = meritBubbles +
+            MeritBubbleData(meritSeq, (d?.meritCount ?: 0) + 1, d?.meritLabel ?: "功德")
+    }
     // 边缘敲击(含纯点击):放音 + 功德+1 + 冒泡 即时触发。
     // 点击边缘不产生系统返回手势,功德/冒泡若只挂在返回回调上,点击就只有声音没有气泡(修过的坑)
     fun knockNow() {
@@ -227,10 +235,21 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "knockNow[edge]: t=$edgeKnockMs")
             KnockSound.play()
         }
-        scope.launch { store.addMerit() }
-        meritSeq++
-        meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
+        grantMerit()
     }
+    // 自动积累功德:开启后按间隔自动 +1 冒泡(自动积累不放音——声音只属于敲击手势)。
+    // 开关/间隔/彩蛋总开关任一变化即重启计时
+    val autoMeritOn = data?.autoMeritEnabled == true && data?.easterEggEnabled == true
+    val autoMeritIntervalMs = ((data?.autoMeritIntervalS ?: 10) * 1000L)
+    LaunchedEffect(autoMeritOn, autoMeritIntervalMs) {
+        if (autoMeritOn) {
+            while (true) {
+                delay(autoMeritIntervalMs)
+                grantMerit()
+            }
+        }
+    }
+
     // 返回手势触发功德彩蛋(补偿路径):无边缘敲击的手势(按键返回/手指落在边缘区外)
     // 在此补 功德+1 + 冒泡 + 声音;本手势边缘已敲过则只消费标记不补
     LaunchedEffect(Unit) {
@@ -248,9 +267,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "backGesture[consume-edge]: t=$now edge=$edgeKnockMs")
                     } else {
                         edgeKnockPending = false
-                        scope.launch { store.addMerit() }
-                        meritSeq++
-                        meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
+                        grantMerit()
                         if (d.meritSoundEnabled == true && now - lastBackKnockMs > 100) {
                             lastBackKnockMs = now
                             if (KnockSound.DEBUG_KNOCK) {
@@ -547,6 +564,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     easterEggEnabled = data.easterEggEnabled,
                     easterEggUnlocked = data.easterEggUnlocked,
                     meritSoundEnabled = data.meritSoundEnabled,
+                    meritLabel = data.meritLabel,
+                    autoMeritEnabled = data.autoMeritEnabled,
+                    autoMeritIntervalS = data.autoMeritIntervalS,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
@@ -557,6 +577,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onEasterEgg = { scope.launch { store.setEasterEggEnabled(it) } },
                     onUnlockEasterEgg = { scope.launch { store.setEasterEggUnlocked() } },
                     onMeritSound = { scope.launch { store.setMeritSoundEnabled(it) } },
+                    onMeritLabel = { scope.launch { store.setMeritLabel(it) } },
+                    onAutoMeritEnabled = { scope.launch { store.setAutoMeritEnabled(it) } },
+                    onAutoMeritIntervalS = { scope.launch { store.setAutoMeritIntervalS(it) } },
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
                     },

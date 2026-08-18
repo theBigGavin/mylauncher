@@ -38,7 +38,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /** 一个功德气泡:从小放大扩散、白→透明消失,位置/字号随机(不影响布局)。 */
-data class MeritBubbleData(val id: Int, val count: Int)
+data class MeritBubbleData(val id: Int, val count: Int, val label: String = "功德")
 
 /** 实时时钟:HH:mm + "星期X · M月D日"。竖屏居中超大细体;横屏左下较小。 */
 @Composable
@@ -224,7 +224,7 @@ private fun MeritBubble(
         contentAlignment = Alignment.TopCenter,
     ) {
         BasicText(
-            text = "功德+${bubble.count}",
+            text = "${bubble.label}+${bubble.count}",
             style = TextStyle(
                 color = Color.White,
                 fontSize = with(density) { animatedSize.toSp() },
