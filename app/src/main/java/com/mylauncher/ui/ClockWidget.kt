@@ -1,5 +1,6 @@
 package com.mylauncher.ui
 
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,11 +33,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+
+/**
+ * 功德气泡调试开关(与 HomeScreen.kt 的 DEBUG_MERIT 同步):改 true 重新安装后,
+ * logcat -s MyLauncher 可见气泡全链路证据 —— 追加(seq/id/长度)/动画完成/协程取消兜底移除。
+ * 实机对比修复前后:自动积累 10s 观察 bubble-finished 与 done-remove 是否一一对应、无 cancel 残留。
+ */
+private const val DEBUG_MERIT = false
 
 /** 一个功德气泡:从小放大扩散、白→透明消失,位置/字号随机(不影响布局)。 */
 data class MeritBubbleData(val id: Int, val count: Int, val label: String = "功德")
@@ -206,9 +216,22 @@ private fun MeritBubble(
     // 字号动画每次只重排这一个文本,开销可忽略,文字始终按自然尺寸渲染
     val animatedSize =
         randomSpec.endSize * (randomSpec.startScale + (1f - randomSpec.startScale) * progress.value)
+    // onDone 经 rememberUpdatedState 取最新实例:重组后动画协程(LaunchedEffect(Unit) 不重启)
+    // 调用的仍是组合期捕获的旧 lambda —— delegate 读写本身动态,但统一走最新引用更稳
+    val currentOnDone by rememberUpdatedState(onDone)
     LaunchedEffect(Unit) {
-        progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
-        onDone()
+        try {
+            progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
+            if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[bubble-finished]: id=${bubble.id}")
+            currentOnDone()
+        } catch (e: CancellationException) {
+            // 动画协程被取消 = 本气泡离开组合树(横竖屏切换/内屏形态变化/父级分支切换)。
+            // 若不兜底移除,onDone 永不执行 → 气泡永久残留在 meritBubbles 列表里,
+            // 自动积累每秒新增放大成「越积越多」(修复的坑)。
+            if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[bubble-canceled]: id=${bubble.id} -> remove")
+            currentOnDone()
+            throw e
+        }
     }
     Box(
         modifier

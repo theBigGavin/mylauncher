@@ -84,6 +84,12 @@ private sealed interface PickerRequest {
     data object Add : PickerRequest
 }
 
+/**
+ * 功德气泡调试开关(与 ClockWidget.kt 的 DEBUG_MERIT 同步):改 true 重新安装后,
+ * logcat -s MyLauncher 可见气泡全链路证据 —— grant(seq/id/长度)/done-remove(id/长度)/auto 起止与 tick。
+ */
+private const val DEBUG_MERIT = false
+
 /** 主屏总装配:方向感知布局 + 全部浮层(改名 / 选择器 / 设置 / 抽屉)。 */
 @Composable
 fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
@@ -269,7 +275,13 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         meritSeq++
         meritBubbles = meritBubbles +
             MeritBubbleData(meritSeq, (d?.meritCount ?: 0) + 1, d?.meritLabel ?: "功德")
+        if (DEBUG_MERIT) {
+            Log.d("MyLauncher", "Merit[grant]: seq=$meritSeq id=$meritSeq size=${meritBubbles.size}")
+        }
     }
+    // grantMerit 经 rememberUpdatedState 取最新实例:autoMerit 的 LaunchedEffect 组合期捕获的
+    // 是旧帧函数(meritBubbles/meritSeq 的 delegate 读写本身动态,防御性统一走最新引用)
+    val grantMeritRef by rememberUpdatedState { grantMerit() }
     // 边缘敲击(含纯点击):放音 + 功德+1 + 冒泡 即时触发。
     // 点击边缘不产生系统返回手势,功德/冒泡若只挂在返回回调上,点击就只有声音没有气泡(修过的坑)
     fun knockNow() {
@@ -290,12 +302,15 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val autoMeritMaxS = data?.autoMeritMaxS ?: 10
     LaunchedEffect(autoMeritOn, autoMeritMaxS) {
         if (autoMeritOn) {
-            repeat(autoMeritMaxS) {
+            if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[auto-start]: maxS=$autoMeritMaxS")
+            repeat(autoMeritMaxS) { tick ->
                 delay(1000)
                 if (currentData?.meritSoundEnabled == true) KnockSound.play()
-                grantMerit()
+                grantMeritRef()
+                if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[auto-tick]: ${tick + 1}/$autoMeritMaxS")
             }
             scope.launch { store.setAutoMeritEnabled(false) }
+            if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[auto-end]")
         }
     }
 
@@ -456,6 +471,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         meritBubbles = meritBubbles,
                         onMeritBubbleDone = { id ->
                             meritBubbles = meritBubbles.filterNot { it.id == id }
+                            if (DEBUG_MERIT) {
+                                Log.d("MyLauncher", "Merit[done-remove]: id=$id size=${meritBubbles.size}")
+                            }
                         },
                     )
                     Spacer(Modifier.height(listSpace))
@@ -527,6 +545,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         meritBubbles = meritBubbles,
                         onMeritBubbleDone = { id ->
                             meritBubbles = meritBubbles.filterNot { it.id == id }
+                            if (DEBUG_MERIT) {
+                                Log.d("MyLauncher", "Merit[done-remove]: id=$id size=${meritBubbles.size}")
+                            }
                         },
                         modifier = Modifier
                             .align(Alignment.BottomStart)
