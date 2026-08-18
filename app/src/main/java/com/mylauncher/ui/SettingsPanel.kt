@@ -607,10 +607,12 @@ private fun LeaderboardSection(
         }
     }
 
-    // 上传按钮:读历史最快纪录 + 会话连击样本数(不足置灰并提示)
+    // 上传按钮:读历史最快纪录 + 会话连击样本数(不足置灰并提示)。
+    // 门槛 20ms = 客户端防重入下限(纪录本身不可能低于它);旧 40ms 门槛
+    // 会把 20-40ms 之间的真实纪录永久锁死,且提示文案误导成"连击不足"(修过的坑)
     val gapMs = fastestKnockGapMs
     val samples = KnockSound.samples
-    val canUpload = gapMs >= 40 && samples >= 10 && !lbUploading
+    val canUpload = gapMs >= 20 && samples >= 10 && !lbUploading
     TextButton(
         text = if (lbUploading) context.getString(R.string.lb_uploading)
         else context.getString(R.string.lb_upload),
@@ -642,10 +644,11 @@ private fun LeaderboardSection(
         enabled = canUpload,
         strong = false,
     )
-    // 不足门槛提示(仅置灰时显示)+ 隐私说明(常显)
-    if (!canUpload) {
+    // 不足门槛提示(仅置灰时显示,按原因区分)+ 隐私说明(常显)
+    if (!canUpload && !lbUploading) {
         BasicText(
-            text = context.getString(R.string.lb_upload_hint),
+            text = if (samples < 10) context.getString(R.string.lb_upload_hint)
+            else context.getString(R.string.lb_rate_abnormal),
             modifier = Modifier.padding(top = 2.dp),
             style = TextStyle(
                 color = Color.White.copy(alpha = 0.45f),

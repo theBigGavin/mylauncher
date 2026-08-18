@@ -24,6 +24,7 @@
     <string name="lb_upload_ok">已上榜：第 %1$d 名（共 %2$d 人）</string>
     <string name="lb_upload_failed">上传失败，请重试</string>
     <string name="lb_upload_hint">连击 10 次以上才能上传</string>
+    <string name="lb_rate_abnormal">成绩异常，无法上传</string>
     <string name="lb_privacy">仅上传昵称与手速成绩</string>
     <string name="lb_loading">加载中…</string>
     <string name="lb_load_failed">加载失败，点击重试</string>
