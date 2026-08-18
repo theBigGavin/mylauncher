@@ -111,6 +111,11 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         withContext(Dispatchers.IO) { repo.refresh() }
         KnockSound.init(context)
     }
+    // 连击手速纪录:KnockSound 刷新会话最快间隔时持久化(设置页"最快手速"展示)
+    DisposableEffect(Unit) {
+        KnockSound.onFastestKnock = { ms -> scope.launch { store.setFastestKnockGapMs(ms) } }
+        onDispose { KnockSound.onFastestKnock = null }
+    }
 
     // 监听安装 / 卸载 / 更新,刷新应用列表
     DisposableEffect(Unit) {
@@ -569,6 +574,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     meritLabel = data.meritLabel,
                     autoMeritEnabled = data.autoMeritEnabled,
                     autoMeritMaxS = data.autoMeritMaxS,
+                    fastestKnockGapMs = data.fastestKnockGapMs,
+                    meritPeak = data.meritPeak,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },

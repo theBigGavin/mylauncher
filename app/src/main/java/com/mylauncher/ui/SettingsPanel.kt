@@ -87,6 +87,8 @@ fun SettingsScreen(
     meritLabel: String,
     autoMeritEnabled: Boolean,
     autoMeritMaxS: Int,
+    fastestKnockGapMs: Int,
+    meritPeak: Int,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
@@ -283,6 +285,29 @@ fun SettingsScreen(
                                     HomeStore.MAX_AUTO_MERIT_INTERVAL_S.toFloat(),
                             ) { onAutoMeritMaxS(it) }
                         }
+                    }
+                    // 战绩展示:最快手速(敲击间隔纪录)与历史最高单日功德
+                    SettingRow("最快手速") {
+                        BasicText(
+                            text = if (fastestKnockGapMs > 0) {
+                                String.format(java.util.Locale.US, "%.1f 次/秒", 1000f / fastestKnockGapMs)
+                            } else {
+                                "—"
+                            },
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                            ),
+                        )
+                    }
+                    SettingRow("每日最高功德") {
+                        BasicText(
+                            text = "$meritPeak",
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                            ),
+                        )
                     }
                 }
 

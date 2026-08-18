@@ -35,6 +35,10 @@ object KnockSound {
     private var pendingPlay = false
     private var lastPlayAtMs = 0L
 
+    // 会话内最快连击间隔(不含首击/闲置间隔);刷新纪录时回调(主屏持久化为历史纪录)
+    private var fastestGapMs = 0
+    var onFastestKnock: ((Int) -> Unit)? = null
+
     /** 应用启动时初始化一次(主线程调用,异步加载)。 */
     fun init(context: Context) {
         if (soundPool != null) return
@@ -64,12 +68,18 @@ object KnockSound {
     fun play() {
         val pool = soundPool ?: return
         val now = System.currentTimeMillis()
-        if (now - lastPlayAtMs < KNOCK_REENTRY_MS) {
-            if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[reentry-dropped]: gap=${now - lastPlayAtMs}ms")
+        val gap = (now - lastPlayAtMs).toInt()
+        if (gap < KNOCK_REENTRY_MS) {
+            if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[reentry-dropped]: gap=${gap}ms")
             return
         }
-        if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[play]: gap=${now - lastPlayAtMs}ms")
+        if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[play]: gap=${gap}ms")
         lastPlayAtMs = now
+        // 连击手速纪录:真实连击(<2s)间隔刷新会话最快值
+        if (gap in (KNOCK_REENTRY_MS + 1)..2000 && (fastestGapMs == 0 || gap < fastestGapMs)) {
+            fastestGapMs = gap
+            onFastestKnock?.invoke(gap)
+        }
         if (loaded) {
             pool.play(soundId, 1f, 1f, 1, 0, 1f)
         } else {

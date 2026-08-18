@@ -37,6 +37,10 @@ data class HomeData(
     val meritDate: String,
     /** 功德按日历史(日期 → 当日计数,保留最近 365 天)。 */
     val meritHistory: Map<String, Int>,
+    /** 历史最高单日功德(每日统计峰值)。 */
+    val meritPeak: Int,
+    /** 最快连击手速纪录(两次敲击的最小间隔 ms,0 = 暂无)。 */
+    val fastestKnockGapMs: Int,
     val easterEggEnabled: Boolean,
     /** 彩蛋是否已解锁(设置页连点版本号 5 次激活,激活后才显示彩蛋设置分组)。 */
     val easterEggUnlocked: Boolean,
@@ -97,6 +101,7 @@ class HomeStore(private val context: Context) {
         private val KEY_MERIT_DATE = stringPreferencesKey("merit_date")
         /** 功德按日历史(每行 "日期 计数",保留最近 365 天)——总功德/每日统计的数据基础。 */
         private val KEY_MERIT_HISTORY = stringPreferencesKey("merit_history")
+        private val KEY_FASTEST_KNOCK = intPreferencesKey("fastest_knock_gap_ms")
         private const val MERIT_HISTORY_DAYS = 365
         private val KEY_EASTER_EGG = booleanPreferencesKey("easter_egg_enabled")
         private val KEY_EASTER_UNLOCKED = booleanPreferencesKey("easter_egg_unlocked")
@@ -142,6 +147,8 @@ class HomeStore(private val context: Context) {
             meritCount = merit.count,
             meritDate = merit.date,
             meritHistory = merit.history,
+            meritPeak = merit.history.values.maxOrNull() ?: 0,
+            fastestKnockGapMs = p[KEY_FASTEST_KNOCK] ?: 0,
             easterEggEnabled = p[KEY_EASTER_EGG] ?: false,
             easterEggUnlocked = p[KEY_EASTER_UNLOCKED] ?: false,
             meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
@@ -279,6 +286,14 @@ class HomeStore(private val context: Context) {
         }
     }
 
+    /** 最快连击手速纪录(两次敲击最小间隔 ms;仅纪录刷新时写入)。 */
+    suspend fun setFastestKnockGapMs(value: Int) {
+        context.homeDataStore.edit {
+            val cur = it[KEY_FASTEST_KNOCK] ?: 0
+            if (cur == 0 || value < cur) it[KEY_FASTEST_KNOCK] = value
+        }
+    }
+
     suspend fun setListHeightPercent(form: String, value: Int) {
         val v = value.coerceIn(25, 100)
         context.homeDataStore.edit {
@@ -343,6 +358,7 @@ class HomeStore(private val context: Context) {
             it[KEY_MERIT_LABEL] = DEFAULT_MERIT_LABEL
             it[KEY_AUTO_MERIT] = false
             it[KEY_AUTO_MERIT_INTERVAL] = DEFAULT_AUTO_MERIT_INTERVAL_S
+            it.remove(KEY_FASTEST_KNOCK)
             it[KEY_MERIT_HISTORY] = ""
             it.remove(KEY_MERIT_DATE)
             it.remove(KEY_MERIT_COUNT)
