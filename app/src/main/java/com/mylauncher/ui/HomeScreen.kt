@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -209,9 +210,13 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     )
     // 最近一次边缘按下敲击的时刻:返回手势完成回调据此去重,避免同一手势响两声
     var lastEdgeKnockMs by remember { mutableLongStateOf(0L) }
+    // 最近一次返回路径补敲的时刻:系统对同一手势双调回调时,两次 emit 间隔 <100ms,
+    // 只响第一声(真实快速连按 >100ms 的独立手势不受影响)
+    var lastBackKnockMs by remember { mutableLongStateOf(0L) }
     fun knockNow() {
         if (soundEnabled && picker == null && !drawerOpen && !showSettings) {
             lastEdgeKnockMs = System.currentTimeMillis()
+            if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "knockNow[edge]: t=$lastEdgeKnockMs")
             KnockSound.play()
         }
     }
@@ -226,10 +231,18 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     meritSeq++
                     meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
                     if (d.meritSoundEnabled == true) {
-                        // 同一手势:边缘按下已敲过就不重复;按键返回等无边缘触发的路径在此补敲。
-                        // 不做全局时长去重 —— 快速连击每次手势都要响(拟真木鱼连敲)
-                        if (System.currentTimeMillis() - lastEdgeKnockMs > 1000) {
+                        val now = System.currentTimeMillis()
+                        // 同一手势:边缘按下已敲过就不重复(1s 手势窗口);
+                        // 按键返回等无边缘触发的路径在此补敲,不做全局时长去重 —— 快速连击每次手势都要响
+                        // 返回路径自去重:系统对同一手势双调回调时两次 emit 间隔 <100ms,只响第一声
+                        if (now - lastEdgeKnockMs > 1000 && now - lastBackKnockMs > 100) {
+                            lastBackKnockMs = now
+                            if (KnockSound.DEBUG_KNOCK) {
+                                Log.d("MyLauncher", "backGesture[play]: t=$now lastEdge=$lastEdgeKnockMs lastBack=$lastBackKnockMs")
+                            }
                             KnockSound.play()
+                        } else if (KnockSound.DEBUG_KNOCK) {
+                            Log.d("MyLauncher", "backGesture[skip]: t=$now lastEdge=$lastEdgeKnockMs lastBack=$lastBackKnockMs")
                         }
                     }
                 }
@@ -274,6 +287,9 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 )
             }
             // 边缘滑入:手指按下屏幕左右边缘的瞬间即敲木鱼(最跟手,不做移动判定)
+            // 手势级防重入:awaitEachGesture 每轮等待全部指针抬起后才进入下一轮,
+            // 一次按下(含多点触控)只执行一轮 → 每次手势最多敲一次;
+            // 兜底:个别设备双上报 down 时由 KnockSound 内部 80ms 物理防重入吸收
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
