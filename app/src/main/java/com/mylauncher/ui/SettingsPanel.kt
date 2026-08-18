@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -135,63 +134,16 @@ fun SettingsScreen(
             customOffsetX = customOffsetX,
             customOffsetY = customOffsetY,
         )
-        Column(Modifier.fillMaxSize()) {
-            // 固定头部(不随内容滚动):返回按钮 + 标题。
-            // 按钮贴屏幕左缘标准 16dp(与抽屉/选择器返回按钮同位置)——设置页为子页面,
-            // 按 UI 规范提供显式返回;副标题与内容行同起点边距
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 20.dp)
-            ) {
-                // 标题居中 + 左上返回按钮(与抽屉/选择器头部同款布局)
-                Box(Modifier.fillMaxWidth()) {
-                    BasicText(
-                        text = "设置",
-                        modifier = Modifier.fillMaxWidth(),
-                        style = TextStyle(
-                            color = Color.White,
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
-                            textAlign = TextAlign.Center,
-                        ),
-                    )
-                    BasicText(
-                        text = "‹ 返回",
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onDismiss() }
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                        style = TextStyle(
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Light,
-                            letterSpacing = 1.sp,
-                        ),
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-                BasicText(
-                    text = "长按主屏空白处打开本页 · 改动实时生效",
-                    modifier = Modifier.fillMaxWidth(),
-                    style = TextStyle(
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                        letterSpacing = 1.sp,
-                        textAlign = TextAlign.Center,
-                    ),
-                )
-            }
-            // 滚动内容:顶部安全区由固定头部占用,滚动容器不重复避让状态栏;
-            // 内容在容器上缘被裁剪,不会穿过状态栏
+        SubPage(
+            title = "设置",
+            subtitle = "长按主屏空白处打开本页 · 改动实时生效",
+            onDismiss = onDismiss,
+        ) {
+            // 滚动内容:与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN)
             Column(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    // 与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN),不再用更宽的 80dp
                     .padding(start = PORTRAIT_ROW_MARGIN, end = PORTRAIT_ROW_MARGIN, bottom = 80.dp)
             ) {
                 Spacer(Modifier.height(12.dp))
