@@ -608,11 +608,11 @@ private fun LeaderboardSection(
     }
 
     // 上传按钮:读历史最快纪录 + 会话连击样本数(不足置灰并提示)。
-    // 门槛 20ms = 客户端防重入下限(纪录本身不可能低于它);旧 40ms 门槛
-    // 会把 20-40ms 之间的真实纪录永久锁死,且提示文案误导成"连击不足"(修过的坑)
+    // 纪录存在即可上传(Gavin 2026-08-19:完全放开下限,娱乐榜)——客户端防重入
+    // 下限 20ms 保证 App 产出的纪录天然 ≥20ms,服务端靠 rate/gapMs 互验兜底伪造
     val gapMs = fastestKnockGapMs
     val samples = KnockSound.samples
-    val canUpload = gapMs >= 20 && samples >= 10 && !lbUploading
+    val canUpload = gapMs > 0 && samples >= 10 && !lbUploading
     TextButton(
         text = if (lbUploading) context.getString(R.string.lb_uploading)
         else context.getString(R.string.lb_upload),
