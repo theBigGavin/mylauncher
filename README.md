@@ -1,43 +1,60 @@
-# MyLauncher
+<div align="center">
 
-Zune / Metro 风格的 Android 第三方桌面:白底撞色锐利壁纸、超大细体时钟、单色化图标 + 超粗 App 名称竖排列表,竖屏横屏自适应。
+# 📱 MyLauncher
+
+**A Zune/Metro-style minimal Android launcher**
+
+White-on-color sharp wallpaper · oversized thin clock · monochrome icons with a bold vertical app list — adaptive in both portrait and landscape.
+
+[简体中文](README_CN.md)
+
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Jetpack Compose](https://img.shields.io/badge/Jetpack_Compose-2.0.21-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![GitHub Stars](https://img.shields.io/github/stars/theBigGavin/mylauncher?style=social&label=Stars)](https://github.com/theBigGavin/mylauncher)
 
 🏠 **Made by Gavin's Lab** — a one-person company run by 7 AI agents on a kanban board: [company site](https://www.hermes.cc.cd) · [live transparency office](https://www.hermes.cc.cd/opc/)
 
-## 功能
+</div>
 
-- 注册为系统 Launcher(HOME),`fullUser` 方向,竖横屏自适应布局
-  - 竖屏:居中细体大时钟 + 竖行 App 列表
-  - 横屏:时钟左下,图标一列垂线对齐、名称一列右对齐
-- 主屏最多 20 个 App,底部计数,可滚动;首启默认加载常用应用(相机/浏览器/图库/设置/微信/Kimi/DeepSeek 等,按包名 + 名称匹配)
-- 无图标、无界面的系统壳应用自动过滤;应用抽屉与选择器可切换"显示系统应用"
-- App 图标取真实图标做**单色化**(亮度→alpha、纯白),内存 + 磁盘双缓存
-- 长按菜单:替换应用(全量选择器,与主屏同款样式)/ 修改名称 / 移除
-- 长按后拖动 = 自定义排序,DataStore 持久化
-- **长按主屏空白处**打开设置页:图标大小、字号实时可调,图标可隐藏,可设为默认桌面,可恢复默认布局
-- **空白处上滑**拉出应用抽屉,点选启动
-- 默认壁纸:生成式 62° 锐利撞色斜带 + 细锐线 + 硬边圆环(Canvas 直绘,无模糊)
+![MyLauncher mockup](design/mockup.png)
 
-## 构建
+## ✨ Features
+
+- **🏠 System launcher (HOME)** — Registered as a system launcher (`fullUser` orientation) with fully adaptive portrait/landscape layouts. Portrait: a centered thin large clock with a vertical app list. Landscape: clock bottom-left, app icons in one vertical line, names right-aligned.
+- **📱 Up to 20 apps on the home screen** — with a bottom counter and scrolling; first launch preloads common apps (camera / browser / gallery / settings / WeChat / Kimi / DeepSeek…, matched by package name + label).
+- **🧹 Smart filtering** — icon-less, UI-less system shell apps are auto-filtered; the app drawer and picker can toggle "show system apps".
+- **⚪ Monochrome icons** — real app icons converted to pure-white monochrome (brightness → alpha), with in-memory + on-disk dual caching.
+- **📋 Long-press menu** — replace app (full picker, same style as the home screen) / rename / remove.
+- **🔄 Drag to reorder** — long-press then drag for custom ordering, persisted via DataStore.
+- **🎛️ Live-adjustable settings** — long-press blank space to open settings: icon size and font size adjust in real time, icons can be hidden, set as default home, restore default layout.
+- **📂 App drawer** — swipe up from blank space to pull out the drawer, tap to launch.
+- **🖼️ Generative wallpaper** — 62° sharp two-tone diagonal bands + fine lines + hard-edge rings, drawn directly on Canvas (no blur, no bitmap).
+- **🪬 Merit wooden fish easter egg** — tap the screen edge to knock (real sound, rapid-fire friendly); completing the back gesture adds +1 merit with a rising bubble. Daily merits are persisted locally, 365-day history.
+- **🔔 Notification badges** — after granting system "notification access", per-package notification counts are shown as badges (toggleable in settings).
+
+## 🚀 Build & install
+
+**Prerequisites**: JDK 17 + Android SDK (compileSdk 35, minSdk 26).
 
 ```bash
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-要求:JDK 17、Android SDK(compileSdk 35,minSdk 26)。
+**Tech stack**: pure Kotlin 2.0 + Jetpack Compose, single `:app` module, package `com.mylauncher`. All UI is self-drawn (no Material dependency).
 
-## 目录
+## 📦 Releases
 
-- `app/src/main/java/com/mylauncher/` — 源码(data / icons / ui)
-- `design/` — 设计稿与效果图生成脚本(`mockup.html` 为可交互原型)
+APKs are published on the [Releases page](https://github.com/theBigGavin/mylauncher/releases) — the latest is **v1.5.3**. Versioning follows semantic versioning `major.minor.patch` (major = breaking change / milestone, minor = new feature, patch = bug fix); `versionCode` increments monotonically with every release.
 
-## 版本规则
+## 🗂️ Project structure
 
-语义化版本 `主版本.次版本.修订号`(如 1.1.0):
+```
+app/src/main/java/com/mylauncher/   # Source code (data / icons / ui)
+design/                             # Mockups & render scripts (mockup.html is an interactive prototype)
+docs/                               # Notes & screenshots
+```
 
-- **主版本**:重大重构 / 不兼容变更 / 里程碑
-- **次版本**:新功能
-- **修订号**:Bug 修复 / 小调整
+## 🤝 Contributing
 
-`versionCode` 每次发版 +1(单调递增,系统据此判断升级)。
+Issues and PRs are welcome — this is an open, transparent one-person company built in public.
