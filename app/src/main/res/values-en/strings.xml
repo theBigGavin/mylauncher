@@ -15,4 +15,26 @@
     <string name="share_default_nickname">Player</string>
     <string name="share_save">Save</string>
     <string name="share_share">Share</string>
+
+    <!-- 手速排行榜(20b):leaderboard section / record dialog -->
+    <string name="lb_section">Speed Leaderboard</string>
+    <string name="lb_nickname_label">Nickname</string>
+    <string name="lb_upload">Upload my speed</string>
+    <string name="lb_uploading">Uploading…</string>
+    <string name="lb_upload_ok">On the board: #%1$d (%2$d players)</string>
+    <string name="lb_upload_failed">Upload failed, please retry</string>
+    <string name="lb_upload_hint">Knock 10+ times to upload</string>
+    <string name="lb_privacy">Only your nickname and speed are uploaded</string>
+    <string name="lb_loading">Loading…</string>
+    <string name="lb_load_failed">Load failed — tap to retry</string>
+    <string name="lb_empty">No entries yet — grab the #1 spot!</string>
+    <string name="lb_my_rank">My rank: %1$s</string>
+    <string name="lb_not_on_board">Not on board</string>
+    <string name="lb_rate_format">%1$s taps/sec</string>
+    <string name="record_title">New record!</string>
+    <string name="record_congrats">New record! You\'re faster than %1$s%% of MyLauncher users worldwide!</string>
+    <string name="record_rate_line">Fastest speed %1$s</string>
+    <string name="record_share_board">Share my record</string>
+    <string name="record_share_image">Generate share image</string>
+    <string name="record_close">Close</string>
 </resources>

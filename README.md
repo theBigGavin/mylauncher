@@ -30,6 +30,8 @@ White-on-color sharp wallpaper · oversized thin clock · monochrome icons with 
 - **📂 App drawer** — swipe up from blank space to pull out the drawer, tap to launch.
 - **🖼️ Generative wallpaper** — 62° sharp two-tone diagonal bands + fine lines + hard-edge rings, drawn directly on Canvas (no blur, no bitmap).
 - **🪬 Merit wooden fish easter egg** — tap the screen edge to knock (real sound, rapid-fire friendly); each edge knock or completed back gesture adds +1 merit with a rising bubble. Customizable merit text (default "功德"), optional auto-accumulate: +1 every second for a configurable continuous duration (10s–600s, default 10s), then the switch turns itself off. Stats shown in settings: fastest knock rate and all-time peak daily merit. Daily merits are persisted locally, 365-day history.
+- **🏆 Speed leaderboard** — knock the wooden fish 10+ times (session count) to unlock upload: your nickname (auto-generated "木鱼玩家#3721"/"Player#3721" on first launch, editable anytime, persisted locally) and fastest tap rate (taps/sec) join a global top-10 board with your own entries highlighted and your rank shown. Breaking a record pops a congratulation dialog with your percentile vs. all players (from GET /percentile), plus one-tap "share to the global board" (goes to the upload section) and "generate a share image to challenge friends" (reuses the share-card component). Network failures degrade silently — the board shows "load failed, tap to retry". Privacy: only nickname + speed are uploaded, no device identifiers (region is not collected).
+- **🖼️ Speed share image** — a Canvas-drawn 1080×1440 share card (same color palette as the wallpaper): brand + fastest speed big number + nickname + daily peak merit + download QR code (ZXing), auto-saved to MediaStore (no permission needed on Android 10+) with system share. Text follows the current locale.
 - **🔔 Notification badges** — after granting system "notification access", per-package notification counts are shown as badges (toggleable in settings).
 
 ## 📸 Screenshots
@@ -49,7 +51,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## 📦 Releases
 
-APKs are published on the [Releases page](https://github.com/theBigGavin/mylauncher/releases) — the latest is **v1.5.3**. Versioning follows semantic versioning `major.minor.patch` (major = breaking change / milestone, minor = new feature, patch = bug fix); `versionCode` increments monotonically with every release.
+APKs are published on the [Releases page](https://github.com/theBigGavin/mylauncher/releases) — the latest is **v1.8.0**. Versioning follows semantic versioning `major.minor.patch` (major = breaking change / milestone, minor = new feature, patch = bug fix); `versionCode` increments monotonically with every release.
 
 ## 🗂️ Project structure
 

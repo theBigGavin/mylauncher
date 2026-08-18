@@ -15,4 +15,26 @@
     <string name="share_default_nickname">木鱼玩家</string>
     <string name="share_save">保存</string>
     <string name="share_share">分享</string>
+
+    <!-- 手速排行榜(20b):设置页彩蛋组小节 / 破纪录弹窗 -->
+    <string name="lb_section">手速排行榜</string>
+    <string name="lb_nickname_label">昵称</string>
+    <string name="lb_upload">上传我的手速</string>
+    <string name="lb_uploading">上传中…</string>
+    <string name="lb_upload_ok">已上榜：第 %1$d 名（共 %2$d 人）</string>
+    <string name="lb_upload_failed">上传失败，请重试</string>
+    <string name="lb_upload_hint">连击 10 次以上才能上传</string>
+    <string name="lb_privacy">仅上传昵称与手速成绩</string>
+    <string name="lb_loading">加载中…</string>
+    <string name="lb_load_failed">加载失败，点击重试</string>
+    <string name="lb_empty">暂无榜单，快来抢占第一名</string>
+    <string name="lb_my_rank">我的名次：%1$s</string>
+    <string name="lb_not_on_board">未上榜</string>
+    <string name="lb_rate_format">%1$s 次/秒</string>
+    <string name="record_title">恭喜你刷新了记录！</string>
+    <string name="record_congrats">恭喜你刷新了记录，超过了全球 %1$s%% 的 MyLauncher 用户！</string>
+    <string name="record_rate_line">最快手速 %1$s</string>
+    <string name="record_share_board">分享记录到全球榜单</string>
+    <string name="record_share_image">生成分享图邀请朋友来挑战</string>
+    <string name="record_close">关闭</string>
 </resources>

@@ -40,6 +40,14 @@ object KnockSound {
     private var fastestGapMs = 0
     var onFastestKnock: ((Int) -> Unit)? = null
 
+    // 会话内有效敲击次数(通过防重入判定的每次敲击 +1)
+    // 排行榜上传门槛:连击 10 次以上才能上传(samples >= 10,随纪录一并上报)
+    private var sessionSamples = 0
+
+    /** 会话内有效敲击样本数(进程生命周期内累计;冷启动重置)。 */
+    val samples: Int
+        get() = sessionSamples
+
     /** 应用启动时初始化一次(主线程调用,异步加载)。 */
     fun init(context: Context) {
         if (soundPool != null) return
@@ -81,6 +89,8 @@ object KnockSound {
             fastestGapMs = gap
             onFastestKnock?.invoke(gap)
         }
+        // 会话连击样本计数:每次有效敲击(通过防重入) +1,供排行榜上传门槛
+        sessionSamples++
         if (loaded) {
             pool.play(soundId, 1f, 1f, 1, 0, 1f)
         } else {

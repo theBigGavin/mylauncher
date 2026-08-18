@@ -31,10 +31,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +49,10 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,7 +61,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.mylauncher.badges.isBadgeListenerEnabled
 import com.mylauncher.R
 import com.mylauncher.data.HomeStore
+import com.mylauncher.data.LeaderboardApi
+import com.mylauncher.data.LeaderboardData
 import com.mylauncher.ui.share.ShareImageActivity
+import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** GitHub Octocat 徽标路径(simple-icons 的 24×24 视图)。 */
@@ -91,6 +99,8 @@ fun SettingsScreen(
     autoMeritMaxS: Int,
     fastestKnockGapMs: Int,
     meritPeak: Int,
+    leaderboardNickname: String,
+    onLeaderboardNickname: (String) -> Unit,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
@@ -311,15 +321,12 @@ fun SettingsScreen(
                             ),
                         )
                     }
-                    // 手速分享图入口预留(20a):20b 建「手速排行榜」小节后,此按钮移入小节下方
-                    TextButton(
-                        text = context.getString(R.string.share_generate),
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(context, ShareImageActivity::class.java))
-                            }
-                        },
-                        strong = false,
+                    // 手速排行榜小节(20b):昵称 / 上传 / 榜单 top10 / 我的名次 / 隐私说明;
+                    // 手速分享图按钮移入小节下方(20a 组件,复用 ShareImageActivity)
+                    LeaderboardSection(
+                        fastestKnockGapMs = fastestKnockGapMs,
+                        nickname = leaderboardNickname,
+                        onNicknameChange = onLeaderboardNickname,
                     )
                 }
 
@@ -421,16 +428,21 @@ private fun TextButton(
     text: String,
     onClick: () -> Unit,
     strong: Boolean,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     BasicText(
         text = text,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 12.dp),
         style = TextStyle(
-            color = if (strong) Color.White else Color.White.copy(alpha = 0.7f),
+            color = when {
+                !enabled -> Color.White.copy(alpha = 0.30f)
+                strong -> Color.White
+                else -> Color.White.copy(alpha = 0.7f)
+            },
             fontSize = 18.sp,
             fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal,
             letterSpacing = 1.sp,
@@ -522,4 +534,224 @@ private fun SettingRow(label: String, content: @Composable () -> Unit) {
         )
         content()
     }
+}
+
+// ───────────────────────── 手速排行榜小节(20b) ─────────────────────────
+
+/** 榜单 UI 状态:加载中 / 失败(点击重试) / 就绪。 */
+private sealed interface LbState {
+    data object Loading : LbState
+    data object Error : LbState
+    data class Ready(val data: LeaderboardData) : LbState
+}
+
+/**
+ * 设置页彩蛋组「手速排行榜」小节:
+ * 昵称输入框(本地持久化,首启自动生成随机名零摩擦) / 上传按钮(gapMs>=40 && 会话连击 samples>=10 才可用)
+ * / 榜单 top10(名次·昵称·次每秒,自己高亮) / 「我的名次」行 / 隐私说明 / 生成分享图入口(20a 组件)。
+ * 网络失败静默降级:榜单显示「加载失败,点击重试」;上传失败 Toast 提示。
+ */
+@Composable
+private fun LeaderboardSection(
+    fastestKnockGapMs: Int,
+    nickname: String,
+    onNicknameChange: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // 昵称本地编辑态(与功德文字同模式:允许编辑中短暂空白,失焦/上传以 trim 为准)
+    var nickText by remember(nickname) { mutableStateOf(nickname) }
+    var lbUploading by remember { mutableStateOf(false) }
+    var lbState by remember { mutableStateOf<LbState>(LbState.Loading) }
+
+    fun reload() {
+        scope.launch {
+            lbState = LbState.Loading
+            val nick = nickText.trim().takeIf { it.isNotEmpty() }
+            val d = LeaderboardApi.fetchLeaderboard(nick)
+            lbState = if (d != null) LbState.Ready(d) else LbState.Error
+        }
+    }
+
+    // 进入小节时拉取一次;「加载失败,点击重试」手动重拉
+    LaunchedEffect(Unit) { reload() }
+
+    SettingSection(context.getString(R.string.lb_section))
+
+    // 昵称输入框(≤16 字符,与榜单契约一致;HomeStore.setLeaderboardNickname 内部再 trim+限长)
+    SettingRow(context.getString(R.string.lb_nickname_label)) {
+        Box(
+            Modifier
+                .width(160.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color.White.copy(alpha = 0.10f))
+                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            BasicTextField(
+                value = nickText,
+                onValueChange = {
+                    nickText = it.take(16)
+                    onNicknameChange(nickText)
+                },
+                singleLine = true,
+                textStyle = TextStyle(
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Light,
+                    letterSpacing = 1.sp,
+                ),
+                cursorBrush = SolidColor(Color.White),
+            )
+        }
+    }
+
+    // 上传按钮:读历史最快纪录 + 会话连击样本数(不足置灰并提示)
+    val gapMs = fastestKnockGapMs
+    val samples = KnockSound.samples
+    val canUpload = gapMs >= 40 && samples >= 10 && !lbUploading
+    TextButton(
+        text = if (lbUploading) context.getString(R.string.lb_uploading)
+        else context.getString(R.string.lb_upload),
+        onClick = {
+            // 昵称兜底:空则生成随机名(与首启一致,零摩擦直接可传),并同步输入框与持久化
+            val finalNick = nickText.trim().ifEmpty {
+                context.getString(R.string.share_default_nickname) + "#" + (1000..9999).random()
+            }
+            nickText = finalNick
+            onNicknameChange(finalNick)
+            scope.launch {
+                lbUploading = true
+                // rate 提交精确值(1000/gapMs),1 位小数会被服务端互验拒绝(实测坑)
+                val resp = LeaderboardApi.submit(finalNick, 1000f / gapMs, gapMs, samples)
+                lbUploading = false
+                if (resp != null) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.lb_upload_ok, resp.rank, resp.totalPlayers),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    // 响应自带 top10:直接刷新榜单,myRank 用本次成绩名次
+                    lbState = LbState.Ready(LeaderboardData(resp.entries, resp.totalPlayers, resp.rank))
+                } else {
+                    Toast.makeText(context, context.getString(R.string.lb_upload_failed), Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+        enabled = canUpload,
+        strong = false,
+    )
+    // 不足门槛提示(仅置灰时显示)+ 隐私说明(常显)
+    if (!canUpload) {
+        BasicText(
+            text = context.getString(R.string.lb_upload_hint),
+            modifier = Modifier.padding(top = 2.dp),
+            style = TextStyle(
+                color = Color.White.copy(alpha = 0.45f),
+                fontSize = 13.sp,
+            ),
+        )
+    }
+    BasicText(
+        text = context.getString(R.string.lb_privacy),
+        modifier = Modifier.padding(top = 2.dp),
+        style = TextStyle(
+            color = Color.White.copy(alpha = 0.35f),
+            fontSize = 12.sp,
+        ),
+    )
+
+    // 榜单 top10 + 我的名次
+    when (val st = lbState) {
+        LbState.Loading -> HintRow(context.getString(R.string.lb_loading))
+        LbState.Error -> TextButton(
+            text = context.getString(R.string.lb_load_failed),
+            onClick = { reload() },
+            strong = false,
+        )
+        is LbState.Ready -> {
+            if (st.data.entries.isEmpty()) {
+                HintRow(context.getString(R.string.lb_empty))
+            } else {
+                val myNick = nickText.trim()
+                st.data.entries.forEach { e ->
+                    val mine = e.nickname == myNick
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        BasicText(
+                            text = "${e.rank}",
+                            modifier = Modifier.width(28.dp),
+                            style = TextStyle(
+                                color = if (mine) Color.White else Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                                fontWeight = if (mine) FontWeight.Bold else FontWeight.Normal,
+                            ),
+                        )
+                        BasicText(
+                            text = e.nickname,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = TextStyle(
+                                color = if (mine) Color.White else Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                                fontWeight = if (mine) FontWeight.Bold else FontWeight.Normal,
+                            ),
+                        )
+                        BasicText(
+                            text = context.getString(
+                                R.string.lb_rate_format,
+                                String.format(Locale.US, "%.1f", e.rate),
+                            ),
+                            style = TextStyle(
+                                color = if (mine) Color.White else Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp,
+                                fontWeight = if (mine) FontWeight.Bold else FontWeight.Normal,
+                            ),
+                        )
+                    }
+                }
+            }
+            // 我的名次(未上榜显示「未上榜」)
+            val rankText = st.data.myRank?.let { "$it" } ?: context.getString(R.string.lb_not_on_board)
+            BasicText(
+                text = context.getString(R.string.lb_my_rank, rankText),
+                modifier = Modifier.padding(top = 8.dp),
+                style = TextStyle(
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 13.sp,
+                ),
+            )
+        }
+    }
+
+    // 生成分享图入口(20a 组件;A 批在「每日最高功德」下方,移入排行榜小节)
+    TextButton(
+        text = context.getString(R.string.share_generate),
+        onClick = {
+            runCatching {
+                context.startActivity(Intent(context, ShareImageActivity::class.java))
+            }
+        },
+        strong = false,
+    )
+}
+
+/** 榜单区占位小字(加载中 / 空榜)。 */
+@Composable
+private fun HintRow(text: String) {
+    BasicText(
+        text = text,
+        modifier = Modifier.padding(vertical = 8.dp),
+        style = TextStyle(
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 14.sp,
+        ),
+    )
 }

@@ -6,6 +6,7 @@ local.properties
 *.iml
 .idea/
 .cxx/
+.kotlin/
 
 # 设计工具链虚拟环境
 .venv/

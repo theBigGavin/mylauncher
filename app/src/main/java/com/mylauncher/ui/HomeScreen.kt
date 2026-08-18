@@ -65,14 +65,19 @@ import com.mylauncher.icons.warmUpIcons
 import com.mylauncher.data.AppRepository
 import com.mylauncher.data.DefaultApps
 import com.mylauncher.data.HomeStore
+import com.mylauncher.data.LeaderboardApi
 import com.mylauncher.data.StoredEntry
 import com.mylauncher.LauncherEvents
+import com.mylauncher.R
+import com.mylauncher.ui.share.ShareImageActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private sealed interface PickerRequest {
     data class Replace(val index: Int) : PickerRequest
@@ -90,6 +95,13 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val allApps by repo.apps.collectAsState()
     val homeData by store.data.collectAsState(initial = null)
     val badgeCounts by BadgeStore.counts.collectAsState()
+
+    // 破纪录弹窗(20b):打破历史纪录(含首次)时弹出,会话内只弹一次(防打扰)
+    var knownRecordMs by remember { mutableIntStateOf(0) }
+    var showRecordDialog by remember { mutableStateOf(false) }
+    var recordPercentile by remember { mutableStateOf<String?>(null) }
+    var recordRateText by remember { mutableStateOf("") }
+    var recordShownThisSession by remember { mutableStateOf(false) }
 
     // 通知角标兜底:部分 ROM 会丢通知回调(角标停在旧值/清零),ON_RESUME 与可见期间周期重算
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -110,10 +122,31 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { repo.refresh() }
         KnockSound.init(context)
+        // 会话开始时已知的历史纪录:破纪录弹窗的比较基准(首次纪录=0 也视为刷新)
+        knownRecordMs = store.data.first().fastestKnockGapMs
     }
-    // 连击手速纪录:KnockSound 刷新会话最快间隔时持久化(设置页"最快手速"展示)
+    // 连击手速纪录:刷新历史纪录时持久化;打破纪录(含首次)弹窗一次,会话内不重复打扰
     DisposableEffect(Unit) {
-        KnockSound.onFastestKnock = { ms -> scope.launch { store.setFastestKnockGapMs(ms) } }
+        KnockSound.onFastestKnock = { ms ->
+            scope.launch {
+                val isNewRecord = knownRecordMs == 0 || ms < knownRecordMs
+                store.setFastestKnockGapMs(ms)
+                if (isNewRecord) knownRecordMs = ms
+                if (isNewRecord && !recordShownThisSession) {
+                    recordShownThisSession = true
+                    // x% 来自 GET /percentile(后端未上线/失败/0 时回退基础文案)
+                    val rate = 1000f / ms
+                    val p = withContext(Dispatchers.IO) { LeaderboardApi.fetchPercentile(rate) }
+                    recordPercentile = p?.takeIf { it > 0f }?.let {
+                        if (it % 1f == 0f) String.format(Locale.US, "%.0f", it)
+                        else String.format(Locale.US, "%.1f", it)
+                    }
+                    recordRateText = String.format(Locale.US, "%.1f", rate) + " " +
+                        context.getString(R.string.share_rate_unit)
+                    showRecordDialog = true
+                }
+            }
+        }
         onDispose { KnockSound.onFastestKnock = null }
     }
 
@@ -143,6 +176,15 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             if (!data.initialized && apps.isNotEmpty()) {
                 store.setEntries(DefaultApps.pick(apps).map { StoredEntry(it.component, null) })
             }
+        }
+    }
+
+    // 排行榜昵称:首启自动生成随机名(「木鱼玩家#3721」式)并持久化 —— 零摩擦直接可上传,用户随时可改
+    LaunchedEffect(data?.leaderboardNickname) {
+        val d = data ?: return@LaunchedEffect
+        if (d.leaderboardNickname.isBlank()) {
+            val prefix = context.getString(R.string.share_default_nickname)
+            store.setLeaderboardNickname("$prefix#${(1000..9999).random()}")
         }
     }
 
@@ -576,6 +618,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     autoMeritMaxS = data.autoMeritMaxS,
                     fastestKnockGapMs = data.fastestKnockGapMs,
                     meritPeak = data.meritPeak,
+                    leaderboardNickname = data.leaderboardNickname,
+                    onLeaderboardNickname = { scope.launch { store.setLeaderboardNickname(it) } },
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
@@ -697,6 +741,27 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 onDismiss = { drawerOpen = false },
             )
         }
+    }
+
+    // 破纪录弹窗(20b):打破历史纪录(含首次)时弹出;「分享到全球榜单」打开设置页排行榜小节上传,
+    // 「生成分享图」跳 20a ShareImageActivity(带昵称);可关闭,会话内只弹一次(防打扰)
+    if (showRecordDialog) {
+        RecordDialog(
+            rateText = recordRateText,
+            percentileText = recordPercentile,
+            onShareBoard = {
+                showRecordDialog = false
+                showSettings = true
+            },
+            onShareImage = {
+                showRecordDialog = false
+                val nick = data?.leaderboardNickname?.ifBlank {
+                    context.getString(R.string.share_default_nickname)
+                }
+                runCatching { ShareImageActivity.launch(context, nick) }
+            },
+            onDismiss = { showRecordDialog = false },
+        )
     }
 
 }

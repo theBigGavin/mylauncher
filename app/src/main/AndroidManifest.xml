@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
+    <!-- 手速排行榜(20b):上传/拉取榜单需要网络;仅上报昵称与成绩,无设备标识 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- 抽屉"删除":ColorOS 等 ROM 的卸载确认页要求调用方持有该权限,否则 UninstallerActivity 直接 finish -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 

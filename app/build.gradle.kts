@@ -24,8 +24,8 @@ android {
         applicationId = "com.mylauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "1.7.0"
+        versionCode = 40
+        versionName = "1.8.0"
     }
 
     signingConfigs {
