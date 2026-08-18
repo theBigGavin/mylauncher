@@ -8,9 +8,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -178,8 +179,8 @@ private fun appInfo(context: Context, entry: AppEntry) {
 
 /**
  * 全屏应用列表层(抽屉 / 选择器共用):
- * 标题 + 系统应用开关 + 可滚动列表,点空白或返回键关闭。
- * 关闭用的点按检测必须用 detectTapGestures —— clickable 会吞掉滚动事件,导致列表无法滚动。
+ * 标题(左上返回按钮)+ 系统应用开关 + 搜索框 + 可滚动列表。
+ * 关闭方式:左上返回按钮 / 返回键 / 边缘返回 / 空白处下滑 —— 空白点按不再关闭(误触频繁,用户反馈取消)。
  * 行内左滑管理与桌面左滑同款手势(awaitPressOutcome 自定义检测,行内标准检测器不可靠)。
  */
 @Composable
@@ -234,13 +235,11 @@ internal fun AppListOverlay(
             customOffsetX = customOffsetX,
             customOffsetY = customOffsetY,
         )
-        // 空白处点按关闭(不吞列表滚动事件);空白处下滑同样收起
+        // 空白处不再点按关闭(误触搜索框边距/标题区会把页面关掉——用户反馈取消此交互);
+        // 空白处下滑仍收起(自然的返回手势),返回键/边缘返回照常关闭
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { onDismiss() })
-                }
                 .pointerInput(Unit) {
                     var downward = false
                     detectVerticalDragGestures(
@@ -256,16 +255,37 @@ internal fun AppListOverlay(
         )
         Column(Modifier.fillMaxSize()) {
             Spacer(Modifier.height((config.screenHeightDp * 0.10f).dp))
-            BasicText(
-                text = title,
-                modifier = Modifier.fillMaxWidth(),
-                style = TextStyle(
-                    color = Color.White,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                ),
-            )
+            // 行内容统一边距(竖屏窄边距,横屏与列表同宽)
+            val rowMargin =
+                if (config.screenWidthDp > config.screenHeightDp) LIST_H_MARGIN else PORTRAIT_ROW_MARGIN
+            // 标题 + 左上返回按钮:子页面提供显式返回入口(返回键/边缘返回/下滑收起之外)
+            Box(Modifier.fillMaxWidth()) {
+                BasicText(
+                    text = title,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Black,
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+                BasicText(
+                    text = "‹ 返回",
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = rowMargin)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onDismiss() }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    style = TextStyle(
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = 1.sp,
+                    ),
+                )
+            }
             Spacer(Modifier.height(8.dp))
             BasicText(
                 text = "$subtitle · 共 ${visible.size} 个应用",
@@ -297,14 +317,19 @@ internal fun AppListOverlay(
             }
             Spacer(Modifier.height(16.dp))
 
-            // 搜索框:圆角底框,按名称/包名过滤
+            // 搜索框:圆角底框,按名称/包名过滤。
+            // 竖屏用行内容同款窄边距(比 80dp 更宽,更好点);整框可点聚焦:
+            // 框的圆角底/描边是视觉一部分,但只有内层 BasicTextField 参与命中,
+            // 点框的边缘内衬区会穿透到背后的手势层(修过的坑)
+            val searchFocus = remember { FocusRequester() }
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = LIST_H_MARGIN, vertical = 6.dp)
+                    .padding(horizontal = rowMargin, vertical = 6.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.White.copy(alpha = 0.10f))
                     .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                    .clickable { searchFocus.requestFocus() }
                     .padding(horizontal = 18.dp, vertical = 12.dp)
             ) {
                 if (query.isEmpty()) {
@@ -330,7 +355,9 @@ internal fun AppListOverlay(
                     ),
                     cursorBrush = SolidColor(Color.White),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(searchFocus),
                 )
             }
             Spacer(Modifier.height(12.dp))
