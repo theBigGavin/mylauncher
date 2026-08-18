@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyLauncher</string>
+
+    <!-- 手速分享图(20a):English -->
+    <string name="share_title">Share My Speed</string>
+    <string name="share_subtitle">Saved to gallery — challenge your friends</string>
+    <string name="share_generate">Generate share image</string>
+    <string name="share_no_record">No speed record yet — knock the block first</string>
+    <string name="share_generate_failed">Generation failed, please retry</string>
+    <string name="share_saved_toast">Saved to %1$s</string>
+    <string name="share_rate_unit">taps/sec</string>
+    <string name="share_tagline">Download MyLauncher and beat my speed!</string>
+    <string name="share_download_hint">Scan to download</string>
+    <string name="share_default_nickname">Player</string>
+    <string name="share_save">Save</string>
+    <string name="share_share">Share</string>
+</resources>

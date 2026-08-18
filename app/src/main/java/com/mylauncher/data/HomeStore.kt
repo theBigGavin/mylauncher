@@ -41,6 +41,8 @@ data class HomeData(
     val meritPeak: Int,
     /** 最快连击手速纪录(两次敲击的最小间隔 ms,0 = 暂无)。 */
     val fastestKnockGapMs: Int,
+    /** 排行榜昵称(本地持久化,20b 输入框写入;空白 = 未设置)。 */
+    val leaderboardNickname: String,
     val easterEggEnabled: Boolean,
     /** 彩蛋是否已解锁(设置页连点版本号 5 次激活,激活后才显示彩蛋设置分组)。 */
     val easterEggUnlocked: Boolean,
@@ -102,6 +104,8 @@ class HomeStore(private val context: Context) {
         /** 功德按日历史(每行 "日期 计数",保留最近 365 天)——总功德/每日统计的数据基础。 */
         private val KEY_MERIT_HISTORY = stringPreferencesKey("merit_history")
         private val KEY_FASTEST_KNOCK = intPreferencesKey("fastest_knock_gap_ms")
+        /** 排行榜昵称(20b 昵称输入框读写)。 */
+        private val KEY_LEADERBOARD_NICKNAME = stringPreferencesKey("leaderboard_nickname")
         private const val MERIT_HISTORY_DAYS = 365
         private val KEY_EASTER_EGG = booleanPreferencesKey("easter_egg_enabled")
         private val KEY_EASTER_UNLOCKED = booleanPreferencesKey("easter_egg_unlocked")
@@ -149,6 +153,7 @@ class HomeStore(private val context: Context) {
             meritHistory = merit.history,
             meritPeak = merit.history.values.maxOrNull() ?: 0,
             fastestKnockGapMs = p[KEY_FASTEST_KNOCK] ?: 0,
+            leaderboardNickname = p[KEY_LEADERBOARD_NICKNAME] ?: "",
             easterEggEnabled = p[KEY_EASTER_EGG] ?: false,
             easterEggUnlocked = p[KEY_EASTER_UNLOCKED] ?: false,
             meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
@@ -294,6 +299,13 @@ class HomeStore(private val context: Context) {
         }
     }
 
+    /** 排行榜昵称:去空白 + 限 16 字符(与榜单契约一致)。 */
+    suspend fun setLeaderboardNickname(value: String) {
+        context.homeDataStore.edit {
+            it[KEY_LEADERBOARD_NICKNAME] = value.trim().take(16)
+        }
+    }
+
     suspend fun setListHeightPercent(form: String, value: Int) {
         val v = value.coerceIn(25, 100)
         context.homeDataStore.edit {
@@ -359,6 +371,7 @@ class HomeStore(private val context: Context) {
             it[KEY_AUTO_MERIT] = false
             it[KEY_AUTO_MERIT_INTERVAL] = DEFAULT_AUTO_MERIT_INTERVAL_S
             it.remove(KEY_FASTEST_KNOCK)
+            it.remove(KEY_LEADERBOARD_NICKNAME)
             it[KEY_MERIT_HISTORY] = ""
             it.remove(KEY_MERIT_DATE)
             it.remove(KEY_MERIT_COUNT)

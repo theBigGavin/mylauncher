@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.mylauncher.badges.isBadgeListenerEnabled
+import com.mylauncher.R
 import com.mylauncher.data.HomeStore
+import com.mylauncher.ui.share.ShareImageActivity
 import kotlin.math.roundToInt
 
 /** GitHub Octocat 徽标路径(simple-icons 的 24×24 视图)。 */
@@ -309,6 +311,16 @@ fun SettingsScreen(
                             ),
                         )
                     }
+                    // 手速分享图入口预留(20a):20b 建「手速排行榜」小节后,此按钮移入小节下方
+                    TextButton(
+                        text = context.getString(R.string.share_generate),
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(context, ShareImageActivity::class.java))
+                            }
+                        },
+                        strong = false,
+                    )
                 }
 
                 SettingSection("其他")

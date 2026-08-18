@@ -24,8 +24,8 @@ android {
         applicationId = "com.mylauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 38
-        versionName = "1.6.7"
+        versionCode = 39
+        versionName = "1.7.0"
     }
 
     signingConfigs {
@@ -78,6 +78,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.material:material")
+    // 手速分享图二维码(项目首个第三方运行时依赖,仅用在 ui/share/ 下)
+    implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.compose.runtime:runtime")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.window:window:1.3.0")

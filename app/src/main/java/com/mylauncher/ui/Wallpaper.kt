@@ -14,8 +14,9 @@ import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.tan
 
-/** 色值与 mockup.html 的 repeating-linear-gradient / render_mockup.py 完全一致。 */
-private val BANDS = listOf(
+/** 色值与 mockup.html 的 repeating-linear-gradient / render_mockup.py 完全一致。
+ * 分享图(ui/share)复用同一色板 —— 改色必须三处同步:BANDS 与 mockup.html / render_mockup.py。 */
+internal val BANDS = listOf(
     0.200f to Color(0xFF120E2C),
     0.035f to Color(0xFFFF3D00),
     0.130f to Color(0xFF1A123A),
@@ -28,9 +29,9 @@ private val BANDS = listOf(
     0.028f to Color(0xFFFF5E3A),
 )
 
-private val LINE_GREEN = Color(0xFFCCFF00)
-private val LINE_TEAL = Color(0xFF00E5C8)
-private val RING_YELLOW = Color(0xFFFFD600)
+internal val LINE_GREEN = Color(0xFFCCFF00)
+internal val LINE_TEAL = Color(0xFF00E5C8)
+internal val RING_YELLOW = Color(0xFFFFD600)
 
 /**
  * 生成式锐利撞色壁纸(无模糊):

@@ -51,6 +51,25 @@
             </intent-filter>
         </activity>
 
+        <!-- 手速分享图(20a):生成 → 自动保存 → 预览/分享 -->
+        <activity
+            android:name=".ui.share.ShareImageActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.MyLauncher" />
+
+        <!-- 分享图(Android 9-):应用外部私有目录经 FileProvider 分享,免存储权限 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- 通知角标:需用户在系统"通知使用权"中开启 -->
         <service
             android:name=".badges.BadgeService"

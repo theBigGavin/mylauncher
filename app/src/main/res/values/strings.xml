@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyLauncher</string>
+
+    <!-- 手速分享图(20a):入口按钮 / 分享图页面 -->
+    <string name="share_title">生成分享图</string>
+    <string name="share_subtitle">保存到相册,分享给好友来挑战</string>
+    <string name="share_generate">生成分享图</string>
+    <string name="share_no_record">还没有手速纪录,先去敲几下木鱼吧</string>
+    <string name="share_generate_failed">生成失败,请重试</string>
+    <string name="share_saved_toast">已保存到 %1$s</string>
+    <string name="share_rate_unit">次/秒</string>
+    <string name="share_tagline">快来下载 MyLauncher 挑战我</string>
+    <string name="share_download_hint">扫码下载</string>
+    <string name="share_default_nickname">木鱼玩家</string>
+    <string name="share_save">保存</string>
+    <string name="share_share">分享</string>
 </resources>
