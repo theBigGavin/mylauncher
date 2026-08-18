@@ -23,11 +23,12 @@ object KnockSound {
     const val DEBUG_KNOCK = false
 
     /**
-     * 物理连敲下限(实测定值,持续修正):用户真实敲击已实测到 14.9 次/秒(≈67ms),
-     * 同一手势双调/双上报的重复触发为毫秒级(≤20ms);取 40ms ——
-     * 真实连击(到 25 次/秒)不误吞,重复触发稳定吸收。
+     * 物理连敲下限(实测定值,持续修正):用户真实敲击已实测到 23.3 次/秒(≈43ms),
+     * 同一手势双调/双上报的重复触发为毫秒级(未实测到 >20ms 的样本);取 20ms ——
+     * 真实连击(到 50 次/秒)不误吞,重复触发稳定吸收。
+     * 注:音源 59ms,超过 ~17 次/秒后放音本就互相重叠,计数与冒泡不受影响。
      */
-    private const val KNOCK_REENTRY_MS = 40L
+    private const val KNOCK_REENTRY_MS = 20L
 
     private var soundPool: SoundPool? = null
     private var soundId = 0
