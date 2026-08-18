@@ -258,7 +258,9 @@ internal fun AppListOverlay(
             // 行内容统一边距(竖屏窄边距,横屏与列表同宽)
             val rowMargin =
                 if (config.screenWidthDp > config.screenHeightDp) LIST_H_MARGIN else PORTRAIT_ROW_MARGIN
-            // 标题 + 左上返回按钮:子页面提供显式返回入口(返回键/边缘返回/下滑收起之外)
+            // 标题 + 左上返回按钮:子页面提供显式返回入口(返回键/边缘返回/下滑收起之外)。
+            // 按钮贴屏幕左缘标准 16dp 内缩(系统返回箭头的惯常位置),
+            // 不用行内容边距 —— 那会让按钮看起来浮在标题行里(修过的坑)
             Box(Modifier.fillMaxWidth()) {
                 BasicText(
                     text = title,
@@ -274,7 +276,7 @@ internal fun AppListOverlay(
                     text = "‹ 返回",
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = rowMargin)
+                        .padding(start = 16.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { onDismiss() }
                         .padding(horizontal = 6.dp, vertical = 4.dp),
