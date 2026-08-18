@@ -294,6 +294,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         if (d?.easterEggEnabled != true) return
         edgeKnockMs = System.currentTimeMillis()
         edgeKnockPending = true
+        // 样本/纪录与音效开关无关:先计数,再按开关放音
+        KnockSound.recordKnock()
         if (d.meritSoundEnabled == true) {
             if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "knockNow[edge]: t=$edgeKnockMs")
             KnockSound.play()
@@ -309,6 +311,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
             if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[auto-start]: maxS=$autoMeritMaxS")
             repeat(autoMeritMaxS) { tick ->
                 delay(1000)
+                KnockSound.recordKnock()
                 if (currentData?.meritSoundEnabled == true) KnockSound.play()
                 grantMeritRef()
                 if (DEBUG_MERIT) Log.d("MyLauncher", "Merit[auto-tick]: ${tick + 1}/$autoMeritMaxS")
@@ -335,6 +338,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "backGesture[consume-edge]: t=$now edge=$edgeKnockMs")
                     } else {
                         edgeKnockPending = false
+                        KnockSound.recordKnock()
                         grantMerit()
                         if (d.meritSoundEnabled == true && now - lastBackKnockMs > 100) {
                             lastBackKnockMs = now

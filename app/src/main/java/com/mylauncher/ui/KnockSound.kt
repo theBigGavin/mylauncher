@@ -43,6 +43,7 @@ object KnockSound {
     // 会话内有效敲击次数(通过防重入判定的每次敲击 +1)
     // 排行榜上传门槛:连击 10 次以上才能上传(samples >= 10,随纪录一并上报)
     private var sessionSamples = 0
+    private var lastKnockAtMs = 0L
 
     /** 会话内有效敲击样本数(进程生命周期内累计;冷启动重置)。 */
     val samples: Int
@@ -71,9 +72,25 @@ object KnockSound {
         }
     }
 
-    /** 敲一次木鱼(非阻塞;未加载完时挂起,加载完成后补敲)。
-     *  同一手势两条触发路径(边缘按下 + 返回完成)的去重由调用方按手势处理;
-     *  这里兜底物理防重入:80ms 内的重复触发直接丢弃,保证不会"嗒嗒"两响。 */
+    /**
+     * 记录一次有效敲击:样本 +1、刷新会话最快纪录(与是否放音无关)。
+     * 音效开关关闭时也必须调用——旧实现把样本/纪录埋在 play() 里,
+     * 关音效后敲击不计数、纪录不更新,上传按钮永久置灰(修过的坑)。
+     */
+    fun recordKnock() {
+        val now = System.currentTimeMillis()
+        val gap = (now - lastKnockAtMs).toInt()
+        if (gap < KNOCK_REENTRY_MS) return
+        lastKnockAtMs = now
+        sessionSamples++
+        // 连击手速纪录:真实连击(<2s)间隔刷新会话最快值
+        if (gap in (KNOCK_REENTRY_MS + 1)..2000 && (fastestGapMs == 0 || gap < fastestGapMs)) {
+            fastestGapMs = gap
+            onFastestKnock?.invoke(gap)
+        }
+    }
+
+    /** 敲一次木鱼(非阻塞;未加载完时挂起,加载完成后补敲)。放音侧自带防重入地板。 */
     fun play() {
         val pool = soundPool ?: return
         val now = System.currentTimeMillis()
@@ -84,13 +101,6 @@ object KnockSound {
         }
         if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[play]: gap=${gap}ms")
         lastPlayAtMs = now
-        // 连击手速纪录:真实连击(<2s)间隔刷新会话最快值
-        if (gap in (KNOCK_REENTRY_MS + 1)..2000 && (fastestGapMs == 0 || gap < fastestGapMs)) {
-            fastestGapMs = gap
-            onFastestKnock?.invoke(gap)
-        }
-        // 会话连击样本计数:每次有效敲击(通过防重入) +1,供排行榜上传门槛
-        sessionSamples++
         if (loaded) {
             pool.play(soundId, 1f, 1f, 1, 0, 1f)
         } else {
