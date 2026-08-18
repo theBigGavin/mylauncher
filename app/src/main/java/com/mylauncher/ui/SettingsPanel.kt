@@ -261,11 +261,6 @@ fun SettingsScreen(
                     onClick = onReset,
                     strong = false,
                 )
-                TextButton(
-                    text = "关闭",
-                    onClick = onDismiss,
-                    strong = false,
-                )
                 Spacer(Modifier.height(28.dp))
                 // 页脚:版本号 + GitHub logo(点击打开仓库);连点版本号 5 次解锁彩蛋设置分组
                 val versionName = runCatching {
