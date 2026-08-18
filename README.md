@@ -16,7 +16,7 @@ White-on-color sharp wallpaper · oversized thin clock · monochrome icons with 
 
 </div>
 
-![MyLauncher mockup](design/mockup.png)
+![MyLauncher](img/mylauncher-landscape.jpg)
 
 ## ✨ Features
 
@@ -31,6 +31,10 @@ White-on-color sharp wallpaper · oversized thin clock · monochrome icons with 
 - **🖼️ Generative wallpaper** — 62° sharp two-tone diagonal bands + fine lines + hard-edge rings, drawn directly on Canvas (no blur, no bitmap).
 - **🪬 Merit wooden fish easter egg** — tap the screen edge to knock (real sound, rapid-fire friendly); completing the back gesture adds +1 merit with a rising bubble. Daily merits are persisted locally, 365-day history.
 - **🔔 Notification badges** — after granting system "notification access", per-package notification counts are shown as badges (toggleable in settings).
+
+## 📸 Screenshots
+
+![MyLauncher portrait home screen](img/mylauncher-portrait.jpg)
 
 ## 🚀 Build & install
 
