@@ -200,16 +200,12 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var showSettings by remember { mutableStateOf(false) }
     // 行内长按接管中(拖动排序):壁纸的"长按开设置""上滑开抽屉"在此期间不触发
     var rowHolding by remember { mutableStateOf(false) }
-    // 功德彩蛋:活跃气泡列表 + 触发序号(系统返回手势触发)
+    // 功德彩蛋:活跃气泡列表 + 触发序号(边缘敲击即时触发,返回路径补触发)
     var meritBubbles by remember { mutableStateOf(listOf<MeritBubbleData>()) }
     var meritSeq by remember { mutableIntStateOf(0) }
     val currentData by rememberUpdatedState(data)
-    // 应用自身边缘检测:滑动一开始移动即敲木鱼(跟手,不等返回手势完成)
-    val soundEnabled by rememberUpdatedState(
-        data?.easterEggEnabled == true && data?.meritSoundEnabled == true
-    )
     // 边缘敲击去重状态:未消费的边缘敲击(标记 + 时刻)。返回完成回调到达时,
-    // 若存在窗口内的未消费边缘敲击,只消费不补敲(同一手势两条路径去重);
+    // 若存在窗口内的未消费边缘敲击,只消费不补(同一手势两条路径去重);
     // 旧实现用全局 1s 时间窗去重:高速连续滑动时手指常落在 44dp 边缘区外,
     // 该手势没敲过,补敲却被上一个手势的边缘敲击误吞 —— 快速连滑会漏音(修过的坑)
     var edgeKnockPending by remember { mutableStateOf(false) }
@@ -219,38 +215,46 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     // 最近一次返回路径补敲的时刻:系统对同一手势双调回调时,两次 emit 间隔 <100ms,
     // 只响第一声(真实快速连按 >100ms 的独立手势不受影响)
     var lastBackKnockMs by remember { mutableLongStateOf(0L) }
+    // 边缘敲击(含纯点击):放音 + 功德+1 + 冒泡 即时触发。
+    // 点击边缘不产生系统返回手势,功德/冒泡若只挂在返回回调上,点击就只有声音没有气泡(修过的坑)
     fun knockNow() {
-        if (soundEnabled && picker == null && !drawerOpen && !showSettings) {
-            edgeKnockMs = System.currentTimeMillis()
-            edgeKnockPending = true
+        if (picker != null || drawerOpen || showSettings) return
+        val d = currentData
+        if (d?.easterEggEnabled != true) return
+        edgeKnockMs = System.currentTimeMillis()
+        edgeKnockPending = true
+        if (d.meritSoundEnabled == true) {
             if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "knockNow[edge]: t=$edgeKnockMs")
             KnockSound.play()
         }
+        scope.launch { store.addMerit() }
+        meritSeq++
+        meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
     }
-    // 返回手势触发功德彩蛋:声音 + 功德+1 + 冒泡
+    // 返回手势触发功德彩蛋(补偿路径):无边缘敲击的手势(按键返回/手指落在边缘区外)
+    // 在此补 功德+1 + 冒泡 + 声音;本手势边缘已敲过则只消费标记不补
     LaunchedEffect(Unit) {
         LauncherEvents.backGesture.collect {
             // 浮层打开时不触发(浮层的返回会先被 Compose BackHandler 消费)
             if (picker == null && !drawerOpen && !showSettings) {
-                scope.launch { store.addMerit() }
                 val d = currentData
                 if (d?.easterEggEnabled == true) {
-                    meritSeq++
-                    meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
-                    if (d.meritSoundEnabled == true) {
-                        val now = System.currentTimeMillis()
-                        // 同一手势去重:本手势边缘已敲 → 只消费标记,不补敲;
-                        // 边缘没敲(手指落在边缘区外/按键返回)→ 补敲,
-                        // 与上一个手势的敲击无关 —— 快速连滑每个手势都响
-                        // 返回路径自去重:系统对同一手势双调回调时两次 emit 间隔 <100ms,只响第一声
-                        if (edgeKnockPending && now - edgeKnockMs <= edgeKnockWindowMs) {
-                            edgeKnockPending = false
-                            if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "backGesture[consume-edge]: t=$now edge=$edgeKnockMs")
-                        } else if (now - lastBackKnockMs > 100) {
-                            edgeKnockPending = false
+                    val now = System.currentTimeMillis()
+                    // 同一手势去重:本手势边缘已敲(功德/冒泡/声音已在边缘路径给出)→ 只消费标记;
+                    // 边缘没敲 → 补敲,与上一个手势的敲击无关 —— 快速连滑每个手势都响
+                    // 返回路径自去重:系统对同一手势双调回调时两次 emit 间隔 <100ms,只响第一声
+                    if (edgeKnockPending && now - edgeKnockMs <= edgeKnockWindowMs) {
+                        edgeKnockPending = false
+                        if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "backGesture[consume-edge]: t=$now edge=$edgeKnockMs")
+                    } else {
+                        edgeKnockPending = false
+                        scope.launch { store.addMerit() }
+                        meritSeq++
+                        meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
+                        if (d.meritSoundEnabled == true && now - lastBackKnockMs > 100) {
                             lastBackKnockMs = now
                             if (KnockSound.DEBUG_KNOCK) {
-                                Log.d("MyLauncher", "backGesture[play]: t=$now edgePending=${edgeKnockPending} lastBack=$lastBackKnockMs")
+                                Log.d("MyLauncher", "backGesture[play]: t=$now lastBack=$lastBackKnockMs")
                             }
                             KnockSound.play()
                         } else if (KnockSound.DEBUG_KNOCK) {

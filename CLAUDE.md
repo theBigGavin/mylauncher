@@ -34,7 +34,7 @@ MyLauncher — Zune/Metro 风格的 Android 桌面(注册为系统 HOME)。竖�
   - `Controls.kt`:共享自绘控件 `MiniSlider` / `MiniSwitch`(白色系,壁纸深底风格)。
   - `Wallpaper`:生成式 Canvas 壁纸(62° 硬边斜带 + -24° 细线 + 右上圆环)。**色板 `BANDS` 与 `mockup.html` / `render_mockup.py` 完全一致,改色必须三处同步**。
   - `ClockWidget` / `RenameDialog` / `SettingsScreen`:各自独立的浮层组件;Popup 一律手写 `PopupPositionProvider` 定位。`SettingsScreen` 是全屏设置页(长按空白打开),**Zune 扁平风格:左对齐大字号,白字直接铺在壁纸上**,含"设为默认桌面"(打开系统 `Settings.ACTION_HOME_SETTINGS` 页面——RoleManager 角色对话框在部分国产 ROM 上读不到 extra 会闪退,ACTION_CHOOSER 不持久化,只有系统设置页能真正改默认;状态在 ON_RESUME 时重新检测,见 LifecycleEventObserver)、`currentDefaultHome` 检测(必须用 resolveActivity,queryIntentActivities 返回全部候选无法判断默认)、通知角标开关 + 通知使用权入口。
-  - 功德木鱼(`HomeScreen` 边缘按下即 `knockNow` 放音 + 返回手势完成时功德+1/冒泡;功德按日持久化在 HomeStore `merit_history`,保留 365 天,总功德/每日统计直接汇总此表):**边缘检测挂在根容器上**(背景层会被列表行/滚动区遮挡,边缘敲击时有时无——修过的坑);**去重按手势不按全局时长**——边缘敲击记 `edgeKnockPending` 标记,返回完成回调 1.5s 窗口内只消费不补敲(同一手势两条路径),已消费/超窗的旧标记不影响后续手势,快速连滑每个手势都响;`KnockSound.play` 不 stop 上一击(59ms 短音自然衰减即止,stop+play 相邻有 SoundPool 流 ID 复用竞态会偶发吃掉新一击——修过的坑),仅 80ms 物理防重入兜底双调/双上报。冒泡各自独立 Animatable,天然并发。
+  - 功德木鱼(`HomeScreen` 边缘按下即 `knockNow` **放音+功德+1+冒泡即时触发**(纯点击边缘也冒泡);无边缘敲击的返回手势在返回回调补 功德+1/冒泡/声音;功德按日持久化在 HomeStore `merit_history`,保留 365 天,总功德/每日统计直接汇总此表):**边缘检测挂在根容器上**(背景层会被列表行/滚动区遮挡,边缘敲击时有时无——修过的坑);**去重按手势不按全局时长**——边缘敲击记 `edgeKnockPending` 标记,返回完成回调 1.5s 窗口内只消费不补敲(同一手势两条路径),已消费/超窗的旧标记不影响后续手势,快速连滑每个手势都响;`KnockSound.play` 不 stop 上一击(59ms 短音自然衰减即止,stop+play 相邻有 SoundPool 流 ID 复用竞态会偶发吃掉新一击——修过的坑),仅 80ms 物理防重入兜底双调/双上报。冒泡各自独立 Animatable,天然并发。
   - `badges/BadgeService.kt`:`NotificationListenerService` 统计各包通知数 → `BadgeStore.counts`(StateFlow)。manifest 里注册了 service + POST_NOTIFICATIONS;需用户在系统"通知使用权"中授权(设置页有入口 + `isBadgeListenerEnabled` 检测)。
 
 ## 关键约定
