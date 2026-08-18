@@ -6,6 +6,8 @@
 
 White-on-color sharp wallpaper · oversized thin clock · monochrome icons with a bold vertical app list — adaptive in both portrait and landscape.
 
+🌍 **Global speed leaderboard** — knock the wooden fish as fast as you can, upload your taps/sec, and race players worldwide. Beat a record and challenge your friends with a share card.
+
 [简体中文](README_CN.md)
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
@@ -20,6 +22,8 @@ White-on-color sharp wallpaper · oversized thin clock · monochrome icons with 
 
 ## ✨ Features
 
+- **🏆 Global speed leaderboard** — the signature viral feature: knock the wooden fish 10+ times to unlock upload, then race the world on a global top-10 board (auto-generated nickname, editable anytime; your entries highlighted; your rank shown). Breaking a record pops a congrats dialog with your percentile vs. all players — one tap to share to the board, one tap to generate a share card with a download QR code. Privacy: only nickname + speed are uploaded, no device identifiers.
+- **🖼️ Speed share image** — a Canvas-drawn 1080×1440 share card (same color palette as the wallpaper): brand + fastest speed big number + nickname + daily peak merit + download QR (ZXing), auto-saved to MediaStore (no permission on Android 10+) with system share. Text follows the current locale.
 - **🏠 System launcher (HOME)** — Registered as a system launcher (`fullUser` orientation) with fully adaptive portrait/landscape layouts. Portrait: a centered thin large clock with a vertical app list. Landscape: clock bottom-left, app icons in one vertical line, names right-aligned.
 - **📱 Up to 20 apps on the home screen** — with a bottom counter and scrolling; first launch preloads common apps (camera / browser / gallery / settings / WeChat / Kimi / DeepSeek…, matched by package name + label).
 - **🧹 Smart filtering** — icon-less, UI-less system shell apps are auto-filtered; the app drawer and picker can toggle "show system apps".
@@ -30,8 +34,6 @@ White-on-color sharp wallpaper · oversized thin clock · monochrome icons with 
 - **📂 App drawer** — swipe up from blank space to pull out the drawer, tap to launch.
 - **🖼️ Generative wallpaper** — 62° sharp two-tone diagonal bands + fine lines + hard-edge rings, drawn directly on Canvas (no blur, no bitmap).
 - **🪬 Merit wooden fish easter egg** — tap the screen edge to knock (real sound, rapid-fire friendly); each edge knock or completed back gesture adds +1 merit with a rising bubble. Customizable merit text (default "功德"), optional auto-accumulate: +1 every second for a configurable continuous duration (10s–600s, default 10s), then the switch turns itself off. Stats shown in settings: fastest knock rate and all-time peak daily merit. Daily merits are persisted locally, 365-day history.
-- **🏆 Speed leaderboard** — knock the wooden fish 10+ times (session count) to unlock upload: your nickname (auto-generated "木鱼玩家#3721"/"Player#3721" on first launch, editable anytime, persisted locally) and fastest tap rate (taps/sec) join a global top-10 board with your own entries highlighted and your rank shown. Breaking a record pops a congratulation dialog with your percentile vs. all players (from GET /percentile), plus one-tap "share to the global board" (goes to the upload section) and "generate a share image to challenge friends" (reuses the share-card component). Network failures degrade silently — the board shows "load failed, tap to retry". Privacy: only nickname + speed are uploaded, no device identifiers (region is not collected).
-- **🖼️ Speed share image** — a Canvas-drawn 1080×1440 share card (same color palette as the wallpaper): brand + fastest speed big number + nickname + daily peak merit + download QR code (ZXing), auto-saved to MediaStore (no permission needed on Android 10+) with system share. Text follows the current locale.
 - **🔔 Notification badges** — after granting system "notification access", per-package notification counts are shown as badges (toggleable in settings).
 
 ## 📸 Screenshots

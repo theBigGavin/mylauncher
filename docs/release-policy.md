@@ -2,6 +2,8 @@
 
 **来源：Gavin 指令 2026-08-18③（原话：「mylauncher 的 release 包的发布我自己会做，你们不要自己编译发布 release 包」）**
 
+**2026-08-19 更新：Gavin 指令「编译一个 release 版本」「然后发版」——本次授权 AI 执行 assembleRelease / tag / gh release 全流程一次（本机已有正式密钥库，产出签名正确）。后续默认仍按原红线（发布归 Gavin），以 Gavin 每次最新指令为准。**
+
 ## 规则（全团队强制）
 
 mylauncher 的 release 包发布**一律由 Gavin 本人执行**：
