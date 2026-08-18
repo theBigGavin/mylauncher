@@ -23,11 +23,11 @@ object KnockSound {
     const val DEBUG_KNOCK = false
 
     /**
-     * 物理连敲下限(实测定值,OPPO 实机 DEBUG_KNOCK 日志 82 次全力连滑样本):
-     * 用户真实敲击最小间隔 100ms;同一手势双调/双上报的重复触发 ≤50ms;
-     * 取中间 60ms —— 真实连击永不误吞,重复触发稳定吸收。
+     * 物理连敲下限(实测定值,持续修正):用户真实敲击已实测到 14.9 次/秒(≈67ms),
+     * 同一手势双调/双上报的重复触发为毫秒级(≤20ms);取 40ms ——
+     * 真实连击(到 25 次/秒)不误吞,重复触发稳定吸收。
      */
-    private const val KNOCK_REENTRY_MS = 60L
+    private const val KNOCK_REENTRY_MS = 40L
 
     private var soundPool: SoundPool? = null
     private var soundId = 0
