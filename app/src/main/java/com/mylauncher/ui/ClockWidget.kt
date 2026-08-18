@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -202,6 +201,11 @@ private fun MeritBubble(
     val bubbleEasing = CubicBezierEasing(0.0f, 0.45f, 0.25f, 1.0f)
     // 气泡文本宽度(用于把气泡水平居中于锚点)
     var widthPx by remember { mutableStateOf(0f) }
+    // 字号随进度增长(替代 graphicsLayer 缩放):大字号文字 + 图层缩放 + 非中心缩放原点
+    // 在部分 ROM 上层光栅化尺寸会算错,文字只剩上半部分(修过的坑);
+    // 字号动画每次只重排这一个文本,开销可忽略,文字始终按自然尺寸渲染
+    val animatedSize =
+        randomSpec.endSize * (randomSpec.startScale + (1f - randomSpec.startScale) * progress.value)
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMillis = 1300, easing = bubbleEasing))
         onDone()
@@ -210,17 +214,12 @@ private fun MeritBubble(
         modifier
             .onSizeChanged { widthPx = it.width.toFloat() }
             .graphicsLayer {
-                // 关键:progress 只在 layer 块内读取,不触发重组(否则文字每帧重排会闪烁)
+                // 图层只做平移与透明(不做缩放/旋转,避免文字光栅化被层变换裁切)
                 val p = progress.value
                 // 锚点 = 时间文字顶部(减半宽使气泡水平居中于锚点),再沿选定方向扩散
                 translationX = (anchorWindowX - rootWindowX) + randomSpec.startXPx + randomSpec.dirX * randomSpec.dist * p - widthPx / 2f
                 translationY = (anchorWindowY - rootWindowY) + randomSpec.dirY * randomSpec.dist * p
-                val sc = randomSpec.startScale + (1f - randomSpec.startScale) * p
-                scaleX = sc
-                scaleY = sc
                 this.alpha = 1f - p
-                // 缩放原点在气泡顶部:气泡从时间文字顶部出现,整体放大
-                transformOrigin = TransformOrigin(0.5f, 0f)
             },
         contentAlignment = Alignment.TopCenter,
     ) {
@@ -228,7 +227,7 @@ private fun MeritBubble(
             text = "功德+${bubble.count}",
             style = TextStyle(
                 color = Color.White,
-                fontSize = with(density) { randomSpec.endSize.toSp() },
+                fontSize = with(density) { animatedSize.toSp() },
                 fontWeight = FontWeight.Black,
                 shadow = textShadow,
             ),
