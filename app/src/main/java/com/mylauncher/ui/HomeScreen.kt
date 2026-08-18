@@ -208,15 +208,22 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     val soundEnabled by rememberUpdatedState(
         data?.easterEggEnabled == true && data?.meritSoundEnabled == true
     )
-    // 最近一次边缘按下敲击的时刻:返回手势完成回调据此去重,避免同一手势响两声
-    var lastEdgeKnockMs by remember { mutableLongStateOf(0L) }
+    // 边缘敲击去重状态:未消费的边缘敲击(标记 + 时刻)。返回完成回调到达时,
+    // 若存在窗口内的未消费边缘敲击,只消费不补敲(同一手势两条路径去重);
+    // 旧实现用全局 1s 时间窗去重:高速连续滑动时手指常落在 44dp 边缘区外,
+    // 该手势没敲过,补敲却被上一个手势的边缘敲击误吞 —— 快速连滑会漏音(修过的坑)
+    var edgeKnockPending by remember { mutableStateOf(false) }
+    var edgeKnockMs by remember { mutableLongStateOf(0L) }
+    // 边缘敲击与返回回调视为同一手势的最大间隔:超过则视作独立手势
+    val edgeKnockWindowMs = 1500L
     // 最近一次返回路径补敲的时刻:系统对同一手势双调回调时,两次 emit 间隔 <100ms,
     // 只响第一声(真实快速连按 >100ms 的独立手势不受影响)
     var lastBackKnockMs by remember { mutableLongStateOf(0L) }
     fun knockNow() {
         if (soundEnabled && picker == null && !drawerOpen && !showSettings) {
-            lastEdgeKnockMs = System.currentTimeMillis()
-            if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "knockNow[edge]: t=$lastEdgeKnockMs")
+            edgeKnockMs = System.currentTimeMillis()
+            edgeKnockPending = true
+            if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "knockNow[edge]: t=$edgeKnockMs")
             KnockSound.play()
         }
     }
@@ -232,17 +239,22 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     meritBubbles = meritBubbles + MeritBubbleData(meritSeq, (d.meritCount) + 1)
                     if (d.meritSoundEnabled == true) {
                         val now = System.currentTimeMillis()
-                        // 同一手势:边缘按下已敲过就不重复(1s 手势窗口);
-                        // 按键返回等无边缘触发的路径在此补敲,不做全局时长去重 —— 快速连击每次手势都要响
+                        // 同一手势去重:本手势边缘已敲 → 只消费标记,不补敲;
+                        // 边缘没敲(手指落在边缘区外/按键返回)→ 补敲,
+                        // 与上一个手势的敲击无关 —— 快速连滑每个手势都响
                         // 返回路径自去重:系统对同一手势双调回调时两次 emit 间隔 <100ms,只响第一声
-                        if (now - lastEdgeKnockMs > 1000 && now - lastBackKnockMs > 100) {
+                        if (edgeKnockPending && now - edgeKnockMs <= edgeKnockWindowMs) {
+                            edgeKnockPending = false
+                            if (KnockSound.DEBUG_KNOCK) Log.d("MyLauncher", "backGesture[consume-edge]: t=$now edge=$edgeKnockMs")
+                        } else if (now - lastBackKnockMs > 100) {
+                            edgeKnockPending = false
                             lastBackKnockMs = now
                             if (KnockSound.DEBUG_KNOCK) {
-                                Log.d("MyLauncher", "backGesture[play]: t=$now lastEdge=$lastEdgeKnockMs lastBack=$lastBackKnockMs")
+                                Log.d("MyLauncher", "backGesture[play]: t=$now edgePending=${edgeKnockPending} lastBack=$lastBackKnockMs")
                             }
                             KnockSound.play()
                         } else if (KnockSound.DEBUG_KNOCK) {
-                            Log.d("MyLauncher", "backGesture[skip]: t=$now lastEdge=$lastEdgeKnockMs lastBack=$lastBackKnockMs")
+                            Log.d("MyLauncher", "backGesture[skip-dedup]: t=$now lastBack=$lastBackKnockMs")
                         }
                     }
                 }
@@ -264,7 +276,25 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     ApplyShowWallpaperFlag(enabled = systemMode)
     val customWallpaper = rememberCustomWallpaper(enabled = customMode)
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            // 边缘滑入:手指按下屏幕左右边缘的瞬间即敲木鱼(最跟手,不做移动判定)。
+            // 挂在根容器上:根是所有子层(时钟/列表行/空白)的祖先,任何位置的边缘按下
+            // 都能收到 —— 挂在背景层上会被列表行/滚动区遮挡,边缘敲击时有时无(修过的坑)
+            // 手势级防重入:awaitEachGesture 每轮等待全部指针抬起后才进入下一轮,
+            // 一次按下(含多点触控)只执行一轮 → 每次手势最多敲一次;
+            // 兜底:个别设备双上报 down 时由 KnockSound 内部 80ms 物理防重入吸收
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val edge = 44.dp.toPx()
+                    if (down.position.x < edge || down.position.x > size.width - edge) {
+                        knockNow()
+                    }
+                }
+            },
+    ) {
         // 竖横屏按宽高比;折叠屏内屏展开(接近方形、宽<高)也强制横屏布局
         val landscape = maxWidth > maxHeight || innerDisplayUnfolded
         val topSpace = maxHeight * 0.20f
@@ -285,19 +315,6 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                         }
                     },
                 )
-            }
-            // 边缘滑入:手指按下屏幕左右边缘的瞬间即敲木鱼(最跟手,不做移动判定)
-            // 手势级防重入:awaitEachGesture 每轮等待全部指针抬起后才进入下一轮,
-            // 一次按下(含多点触控)只执行一轮 → 每次手势最多敲一次;
-            // 兜底:个别设备双上报 down 时由 KnockSound 内部 80ms 物理防重入吸收
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val edge = 44.dp.toPx()
-                    if (down.position.x < edge || down.position.x > size.width - edge) {
-                        knockNow()
-                    }
-                }
             }
             .pointerInput(Unit) {
                 var upward = false
