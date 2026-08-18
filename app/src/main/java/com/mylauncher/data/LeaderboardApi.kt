@@ -11,10 +11,10 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /**
- * 手速排行榜后端基地址(20 卡已上线:mrd server 挂载 /api/v1/knock)。
+ * 手速排行榜后端基地址(0819-k 卡:后端迁 hermes.cc.cd 独立进程,旧 mrd 路径仅留 302 重定向)。
  * 换环境只改这一处(与计划文档契约一致:Base = https://<域名>/api/v1/knock)。
  */
-const val LEADERBOARD_BASE_URL = "https://mrd.hermes.cc.cd/api/v1/knock"
+const val LEADERBOARD_BASE_URL = "https://hermes.cc.cd/api/v1/knock"
 
 /** 榜单条目(服务端只存昵称与成绩,无设备标识)。 */
 data class LeaderboardEntry(
