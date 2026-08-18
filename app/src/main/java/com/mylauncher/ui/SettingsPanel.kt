@@ -134,36 +134,62 @@ fun SettingsScreen(
             customOffsetX = customOffsetX,
             customOffsetY = customOffsetY,
         )
-        Column(
-            Modifier
-                .fillMaxSize()
-                // 顶部安全区:滚动容器整体压在状态栏之下,滚动内容在容器上缘被裁剪,
-                // 不会穿过系统状态栏(状态栏留白透出壁纸)
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                // 与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN),不再用更宽的 80dp
-                .padding(start = PORTRAIT_ROW_MARGIN, end = PORTRAIT_ROW_MARGIN, bottom = 80.dp)
-        ) {
-            Spacer(Modifier.height((config.screenHeightDp * 0.10f).dp))
-            BasicText(
-                text = "设置",
-                style = TextStyle(
-                    color = Color.White,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp,
-                ),
-            )
-            Spacer(Modifier.height(6.dp))
-            BasicText(
-                text = "长按主屏空白处打开本页 · 改动实时生效",
-                style = TextStyle(
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 13.sp,
-                    letterSpacing = 1.sp,
-                ),
-            )
-            Spacer(Modifier.height(28.dp))
+        Column(Modifier.fillMaxSize()) {
+            // 固定头部(不随内容滚动):返回按钮 + 标题。
+            // 按钮贴屏幕左缘标准 16dp(与抽屉/选择器返回按钮同位置)——设置页为子页面,
+            // 按 UI 规范提供显式返回;副标题与内容行同起点边距
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 16.dp, end = PORTRAIT_ROW_MARGIN, top = 24.dp, bottom = 20.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BasicText(
+                        text = "‹ 返回",
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onDismiss() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        style = TextStyle(
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Light,
+                            letterSpacing = 1.sp,
+                        ),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    BasicText(
+                        text = "设置",
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 34.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                        ),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                BasicText(
+                    text = "长按主屏空白处打开本页 · 改动实时生效",
+                    modifier = Modifier.padding(start = PORTRAIT_ROW_MARGIN - 16.dp),
+                    style = TextStyle(
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 13.sp,
+                        letterSpacing = 1.sp,
+                    ),
+                )
+            }
+            // 滚动内容:顶部安全区由固定头部占用,滚动容器不重复避让状态栏;
+            // 内容在容器上缘被裁剪,不会穿过状态栏
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    // 与桌面/抽屉/选择器的行起点边距统一(PORTRAIT_ROW_MARGIN),不再用更宽的 80dp
+                    .padding(start = PORTRAIT_ROW_MARGIN, end = PORTRAIT_ROW_MARGIN, bottom = 80.dp)
+            ) {
+                Spacer(Modifier.height(12.dp))
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -341,6 +367,7 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
