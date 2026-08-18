@@ -22,8 +22,12 @@ object KnockSound {
     /** 实机定位开关:改 true 重新安装后,logcat -s MyLauncher 可见双响路径的时间戳证据。 */
     const val DEBUG_KNOCK = false
 
-    /** 物理连敲下限:同一次敲击的重复触发(双调/双路径/双上报)间隔不可能低于此值。 */
-    private const val KNOCK_REENTRY_MS = 80L
+    /**
+     * 物理连敲下限(实测定值,OPPO 实机 DEBUG_KNOCK 日志 82 次全力连滑样本):
+     * 用户真实敲击最小间隔 100ms;同一手势双调/双上报的重复触发 ≤50ms;
+     * 取中间 60ms —— 真实连击永不误吞,重复触发稳定吸收。
+     */
+    private const val KNOCK_REENTRY_MS = 60L
 
     private var soundPool: SoundPool? = null
     private var soundId = 0
@@ -64,6 +68,7 @@ object KnockSound {
             if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[reentry-dropped]: gap=${now - lastPlayAtMs}ms")
             return
         }
+        if (DEBUG_KNOCK) Log.d("MyLauncher", "KnockSound[play]: gap=${now - lastPlayAtMs}ms")
         lastPlayAtMs = now
         if (loaded) {
             pool.play(soundId, 1f, 1f, 1, 0, 1f)
