@@ -29,7 +29,7 @@ White-on-color sharp wallpaper · oversized thin clock · monochrome icons with 
 - **🎛️ Live-adjustable settings** — long-press blank space to open settings: icon size and font size adjust in real time, icons can be hidden, set as default home, restore default layout.
 - **📂 App drawer** — swipe up from blank space to pull out the drawer, tap to launch.
 - **🖼️ Generative wallpaper** — 62° sharp two-tone diagonal bands + fine lines + hard-edge rings, drawn directly on Canvas (no blur, no bitmap).
-- **🪬 Merit wooden fish easter egg** — tap the screen edge to knock (real sound, rapid-fire friendly); each edge knock or completed back gesture adds +1 merit with a rising bubble. Customizable merit text (default "功德"), optional auto-accumulate with a configurable interval (10s–600s, default 10s). Daily merits are persisted locally, 365-day history.
+- **🪬 Merit wooden fish easter egg** — tap the screen edge to knock (real sound, rapid-fire friendly); each edge knock or completed back gesture adds +1 merit with a rising bubble. Customizable merit text (default "功德"), optional auto-accumulate: +1 every second for a configurable continuous duration (10s–600s, default 10s), then the switch turns itself off. Daily merits are persisted locally, 365-day history.
 - **🔔 Notification badges** — after granting system "notification access", per-package notification counts are shown as badges (toggleable in settings).
 
 ## 📸 Screenshots

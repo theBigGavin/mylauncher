@@ -237,17 +237,18 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         }
         grantMerit()
     }
-    // 自动积累功德:开启后按间隔自动 放音+功德+1+冒泡(与敲击同款体验)。
-    // 开关/间隔/彩蛋总开关任一变化即重启计时
+    // 自动积累功德:开启后每秒 放音+功德+1+冒泡,连续积累时长上限 autoMeritMaxS 秒;
+    // 时长用尽自动关闭自动积累开关(设置页开关同步回弹)
     val autoMeritOn = data?.autoMeritEnabled == true && data?.easterEggEnabled == true
-    val autoMeritIntervalMs = ((data?.autoMeritIntervalS ?: 10) * 1000L)
-    LaunchedEffect(autoMeritOn, autoMeritIntervalMs) {
+    val autoMeritMaxS = data?.autoMeritMaxS ?: 10
+    LaunchedEffect(autoMeritOn, autoMeritMaxS) {
         if (autoMeritOn) {
-            while (true) {
-                delay(autoMeritIntervalMs)
+            repeat(autoMeritMaxS) {
+                delay(1000)
                 if (currentData?.meritSoundEnabled == true) KnockSound.play()
                 grantMerit()
             }
+            scope.launch { store.setAutoMeritEnabled(false) }
         }
     }
 
@@ -567,7 +568,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     meritSoundEnabled = data.meritSoundEnabled,
                     meritLabel = data.meritLabel,
                     autoMeritEnabled = data.autoMeritEnabled,
-                    autoMeritIntervalS = data.autoMeritIntervalS,
+                    autoMeritMaxS = data.autoMeritMaxS,
                     onIconSize = { scope.launch { store.setIconSize(it) } },
                     onFontSize = { scope.launch { store.setFontSize(it) } },
                     onRowSpacing = { scope.launch { store.setRowSpacing(it) } },
@@ -587,7 +588,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                             if (v) store.setEasterEggEnabled(true)
                         }
                     },
-                    onAutoMeritIntervalS = { scope.launch { store.setAutoMeritIntervalS(it) } },
+                    onAutoMeritMaxS = { scope.launch { store.setAutoMeritMaxS(it) } },
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
                     },

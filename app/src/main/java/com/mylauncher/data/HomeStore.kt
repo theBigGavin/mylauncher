@@ -45,8 +45,8 @@ data class HomeData(
     val meritLabel: String,
     /** 自动积累功德开关。 */
     val autoMeritEnabled: Boolean,
-    /** 自动积累间隔(秒,10..600)。 */
-    val autoMeritIntervalS: Int,
+    /** 自动积累连续时长上限(秒,10..600):开启后每秒 +1,最多连续积累这么多秒。 */
+    val autoMeritMaxS: Int,
     val wallpaperMode: String,
     /** 桌面列表视口高度(占屏高百分比,横竖屏分开配置)。 */
     val listHeightPercent: Int,
@@ -147,7 +147,7 @@ class HomeStore(private val context: Context) {
             meritSoundEnabled = p[KEY_MERIT_SOUND] ?: true,
             meritLabel = p[KEY_MERIT_LABEL]?.takeIf { it.isNotBlank() } ?: DEFAULT_MERIT_LABEL,
             autoMeritEnabled = p[KEY_AUTO_MERIT] ?: false,
-            autoMeritIntervalS = p[KEY_AUTO_MERIT_INTERVAL] ?: DEFAULT_AUTO_MERIT_INTERVAL_S,
+            autoMeritMaxS = p[KEY_AUTO_MERIT_INTERVAL] ?: DEFAULT_AUTO_MERIT_INTERVAL_S,
             wallpaperMode = p[KEY_WALLPAPER] ?: WALLPAPER_BUILTIN,
             listHeightPercent = p[KEY_LIST_HEIGHT] ?: DEFAULT_LIST_HEIGHT_PERCENT,
             listHeightPercentLandscape = p[KEY_LIST_HEIGHT_LS] ?: 100,
@@ -272,7 +272,8 @@ class HomeStore(private val context: Context) {
         context.homeDataStore.edit { it[KEY_AUTO_MERIT] = value }
     }
 
-    suspend fun setAutoMeritIntervalS(value: Int) {
+    /** 连续积累时长上限(秒,10..600)。 */
+    suspend fun setAutoMeritMaxS(value: Int) {
         context.homeDataStore.edit {
             it[KEY_AUTO_MERIT_INTERVAL] = value.coerceIn(MIN_AUTO_MERIT_INTERVAL_S, MAX_AUTO_MERIT_INTERVAL_S)
         }

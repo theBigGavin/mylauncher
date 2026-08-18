@@ -86,7 +86,7 @@ fun SettingsScreen(
     meritSoundEnabled: Boolean,
     meritLabel: String,
     autoMeritEnabled: Boolean,
-    autoMeritIntervalS: Int,
+    autoMeritMaxS: Int,
     onIconSize: (Int) -> Unit,
     onFontSize: (Int) -> Unit,
     onRowSpacing: (Int) -> Unit,
@@ -99,7 +99,7 @@ fun SettingsScreen(
     onMeritSound: (Boolean) -> Unit,
     onMeritLabel: (String) -> Unit,
     onAutoMeritEnabled: (Boolean) -> Unit,
-    onAutoMeritIntervalS: (Int) -> Unit,
+    onAutoMeritMaxS: (Int) -> Unit,
     onPickSystemWallpaper: () -> Unit,
     onListHeight: (form: String, value: Int) -> Unit,
     onReset: () -> Unit,
@@ -274,12 +274,14 @@ fun SettingsScreen(
                         MiniSwitch(checked = autoMeritEnabled, onChange = onAutoMeritEnabled)
                     }
                     if (autoMeritEnabled) {
-                        SettingRow("自动积累间隔(秒)") {
+                        // 连续积累时长:开启后每秒 +1,最多连续积累这么多秒,
+                        // 到期暂停,回到桌面/解锁重新开始一轮
+                        SettingRow("连续积累时长(秒)") {
                             SliderSetting(
-                                autoMeritIntervalS,
+                                autoMeritMaxS,
                                 HomeStore.MIN_AUTO_MERIT_INTERVAL_S.toFloat()..
                                     HomeStore.MAX_AUTO_MERIT_INTERVAL_S.toFloat(),
-                            ) { onAutoMeritIntervalS(it) }
+                            ) { onAutoMeritMaxS(it) }
                         }
                     }
                 }
