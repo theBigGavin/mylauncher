@@ -237,7 +237,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         }
         grantMerit()
     }
-    // 自动积累功德:开启后按间隔自动 +1 冒泡(自动积累不放音——声音只属于敲击手势)。
+    // 自动积累功德:开启后按间隔自动 放音+功德+1+冒泡(与敲击同款体验)。
     // 开关/间隔/彩蛋总开关任一变化即重启计时
     val autoMeritOn = data?.autoMeritEnabled == true && data?.easterEggEnabled == true
     val autoMeritIntervalMs = ((data?.autoMeritIntervalS ?: 10) * 1000L)
@@ -245,6 +245,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         if (autoMeritOn) {
             while (true) {
                 delay(autoMeritIntervalMs)
+                if (currentData?.meritSoundEnabled == true) KnockSound.play()
                 grantMerit()
             }
         }
@@ -578,7 +579,14 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     onUnlockEasterEgg = { scope.launch { store.setEasterEggUnlocked() } },
                     onMeritSound = { scope.launch { store.setMeritSoundEnabled(it) } },
                     onMeritLabel = { scope.launch { store.setMeritLabel(it) } },
-                    onAutoMeritEnabled = { scope.launch { store.setAutoMeritEnabled(it) } },
+                    onAutoMeritEnabled = { v ->
+                        scope.launch {
+                            store.setAutoMeritEnabled(v)
+                            // 开启自动积累时同步开启彩蛋总开关:
+                            // 总开关关闭时自动积累静默,会让人以为功能失效(修过的坑)
+                            if (v) store.setEasterEggEnabled(true)
+                        }
+                    },
                     onAutoMeritIntervalS = { scope.launch { store.setAutoMeritIntervalS(it) } },
                     onPickSystemWallpaper = {
                         openSystemWallpaper()
