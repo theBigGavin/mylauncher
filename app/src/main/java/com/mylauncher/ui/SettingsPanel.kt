@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -142,12 +143,25 @@ fun SettingsScreen(
                 Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(start = 16.dp, end = PORTRAIT_ROW_MARGIN, top = 24.dp, bottom = 20.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 20.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // 标题居中 + 左上返回按钮(与抽屉/选择器头部同款布局)
+                Box(Modifier.fillMaxWidth()) {
+                    BasicText(
+                        text = "设置",
+                        modifier = Modifier.fillMaxWidth(),
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 34.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                            textAlign = TextAlign.Center,
+                        ),
+                    )
                     BasicText(
                         text = "‹ 返回",
                         modifier = Modifier
+                            .align(Alignment.CenterStart)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onDismiss() }
                             .padding(horizontal = 6.dp, vertical = 4.dp),
@@ -158,25 +172,16 @@ fun SettingsScreen(
                             letterSpacing = 1.sp,
                         ),
                     )
-                    Spacer(Modifier.width(10.dp))
-                    BasicText(
-                        text = "设置",
-                        style = TextStyle(
-                            color = Color.White,
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
-                        ),
-                    )
                 }
                 Spacer(Modifier.height(6.dp))
                 BasicText(
                     text = "长按主屏空白处打开本页 · 改动实时生效",
-                    modifier = Modifier.padding(start = PORTRAIT_ROW_MARGIN - 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     style = TextStyle(
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 13.sp,
                         letterSpacing = 1.sp,
+                        textAlign = TextAlign.Center,
                     ),
                 )
             }

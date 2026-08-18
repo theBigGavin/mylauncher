@@ -24,8 +24,8 @@ android {
         applicationId = "com.mylauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 27
-        versionName = "1.5.9"
+        versionCode = 28
+        versionName = "1.5.10"
     }
 
     signingConfigs {
