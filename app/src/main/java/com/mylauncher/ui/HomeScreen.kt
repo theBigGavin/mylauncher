@@ -135,6 +135,10 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     DisposableEffect(Unit) {
         KnockSound.onFastestKnock = { ms ->
             scope.launch {
+                // 冷启动竞态保护:回调可能先于上方 LaunchedEffect 的基线读取执行,
+                // 此时 knownRecordMs 仍是初始 0(基线未读),先等 DataStore 基线就绪再判断,
+                // 避免把旧纪录误判为新纪录误弹窗(或漏弹);已就绪时 first() 立即返回,无额外开销。
+                if (knownRecordMs == 0) knownRecordMs = store.data.first().fastestKnockGapMs
                 val isNewRecord = knownRecordMs == 0 || ms < knownRecordMs
                 store.setFastestKnockGapMs(ms)
                 if (isNewRecord) knownRecordMs = ms

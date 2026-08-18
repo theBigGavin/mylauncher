@@ -38,10 +38,28 @@ object ShareImageSaver {
     /** Toast 展示用路径文案(29+ 显示相册相对路径,以下显示绝对路径)。 */
     fun displayPath(context: Context, uri: Uri): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Environment.DIRECTORY_PICTURES + "/" + DIR_NAME + "/" + uri.lastPathSegment
+            // uri.lastPathSegment 是 MediaStore 行 ID 数字而非文件名:查 DISPLAY_NAME 取真实文件名,
+            // 查询失败回退为只显示目录(不显示假文件名)。
+            val displayName = queryDisplayName(context, uri)
+            if (displayName != null) {
+                Environment.DIRECTORY_PICTURES + "/" + DIR_NAME + "/" + displayName
+            } else {
+                Environment.DIRECTORY_PICTURES + "/" + DIR_NAME
+            }
         } else {
             runCatching { File(uri.path!!).absolutePath }.getOrDefault(uri.toString())
         }
+
+    /** 查 MediaStore 返回真实文件名(DISPLAY_NAME);查询失败返回 null。 */
+    private fun queryDisplayName(context: Context, uri: Uri): String? = runCatching {
+        context.contentResolver.query(
+            uri,
+            arrayOf(MediaStore.Images.Media.DISPLAY_NAME),
+            null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull()
 
     /** ACTION_SEND 分享 Intent(带 PNG,含读权限授予)。 */
     fun shareIntent(context: Context, uri: Uri): Intent =
@@ -81,6 +99,7 @@ object ShareImageSaver {
         return FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
     }
 
+    // 毫秒级时间戳:同秒内多次保存不重名覆盖(秒级精度下第二次保存会覆盖旧文件)
     private fun timestamp(): String =
-        SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
 }
