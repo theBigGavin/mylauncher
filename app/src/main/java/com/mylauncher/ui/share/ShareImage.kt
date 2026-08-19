@@ -34,8 +34,8 @@ import kotlin.math.tan
  * 文案全部由调用方按当前 Locale 解析后传入(见 ShareImageData),渲染层不触碰资源。
  */
 
-/** 分享图下载二维码指向的地址:默认 GitHub Releases 最新页,可换成官网落地页。 */
-const val DOWNLOAD_URL = "https://github.com/theBigGavin/mylauncher/releases/latest"
+/** 分享图下载二维码指向的地址:全球榜单页(带 UTM 引流跟踪)。 */
+const val LEADERBOARD_URL = "https://www.hermes.cc.cd/leaderboard/?utm_source=mylauncher&utm_medium=share_image&utm_campaign=leaderboard"
 
 /** 分享图渲染输入:文案已按当前 Locale 由调用方解析好。 */
 data class ShareImageData(
@@ -49,10 +49,10 @@ data class ShareImageData(
     val meritText: String,
     /** CTA 文案:"快来下载 MyLauncher 挑战我"。 */
     val tagline: String,
-    /** 二维码下方小字:"扫码下载"。 */
+    /** 二维码下方小字:"扫码看全球榜"。 */
     val downloadHint: String,
-    /** 二维码内容(下载地址)。 */
-    val qrContent: String = DOWNLOAD_URL,
+    /** 二维码内容(全球榜单页地址,带 UTM)。 */
+    val qrContent: String = LEADERBOARD_URL,
 )
 
 private const val CARD_W = 1080

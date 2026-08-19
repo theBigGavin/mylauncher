@@ -11,7 +11,7 @@
     <string name="share_saved_toast">Saved to %1$s</string>
     <string name="share_rate_unit">taps/sec</string>
     <string name="share_tagline">Download MyLauncher and beat my speed!</string>
-    <string name="share_download_hint">Scan to download</string>
+    <string name="share_download_hint">Scan to see global ranking</string>
     <string name="share_default_nickname">Player</string>
     <string name="share_save">Save</string>
     <string name="share_share">Share</string>
