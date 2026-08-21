@@ -833,7 +833,8 @@ fun AppList(
                 } else {
                     AddRow(
                         iconSize = iconSize,
-                        fontSize = fontSize,
+                        // 提示字号比应用名小一号(用户反馈),随字号设置等比缩放
+                        fontSize = fontSize * 0.7f,
                         showIcons = showIcons,
                         landscape = landscape,
                         onClick = null,
