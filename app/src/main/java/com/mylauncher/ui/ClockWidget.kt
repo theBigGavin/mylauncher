@@ -3,7 +3,6 @@ package com.mylauncher.ui
 import android.util.Log
 import android.content.Intent
 import android.provider.AlarmClock
-import android.provider.CalendarContract
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -149,8 +148,10 @@ fun ClockWidget(
                     .clip(RoundedCornerShape(10.dp))
                     .clickable {
                         runCatching {
+                            // 用日历专属类别,ACTION_VIEW+CONTENT_URI 会被通用处理器抢
+                            // (OPPO 实测弹出 信息/Google/LibChecker,全是错的应用)
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW).setData(CalendarContract.CONTENT_URI)
+                                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
                             )
                         }
                     },
