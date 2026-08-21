@@ -23,13 +23,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.mylauncher.R
 
 /**
  * 破纪录弹窗(20b):敲出历史新纪录时主页弹出。
  * 文案:基础「恭喜你刷新了记录!」,percentile 拉取成功时接「超过了全球 x% 的 MyLauncher 用户!」。
  * 两操作:分享记录到全球榜单(跳设置页上传)/ 生成分享图邀请朋友来挑战(跳 20a 分享图)。
- * 可关闭(按钮 / 点外部),会话内只弹一次(防打扰在调用方控制)。
+ * 关闭走 关闭 按钮 / 返回键;会话内只弹一次(防打扰在调用方控制)。
+ * 注意:不响应外部点击 —— 弹窗出现时用户往往还在连续敲击边缘,敲击落在弹窗外,
+ * 默认 dismissOnClickOutside 会让第一下敲击就把弹窗关掉,用户根本看不到提醒(修过的坑)。
  */
 @Composable
 fun RecordDialog(
@@ -41,7 +44,10 @@ fun RecordDialog(
     onShareImage: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnClickOutside = false),
+    ) {
         Column(
             Modifier
                 .width(320.dp)
