@@ -309,7 +309,7 @@ fun AppRow(
 
 /**
  * 列表尾部提示行:"＋ 添加应用"(可点)与"桌面已满"(不可点,槽位用尽时提示)共用:
- * 虚线框 + 可选的加号,细体白色 70% 名称。
+ * 虚线框 + 加号(或框内字符),细体白色 70% 名称。
  */
 @Composable
 private fun AddRow(
@@ -319,7 +319,7 @@ private fun AddRow(
     landscape: Boolean,
     onClick: (() -> Unit)?,
     text: String = "添加应用",
-    showPlus: Boolean = true,
+    boxLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -348,12 +348,22 @@ private fun AddRow(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                if (showPlus) {
+                if (boxLabel == null) {
                     Canvas(Modifier.size(iconSize * 0.5f)) {
                         val sw = maxOf(1.5f, size.minDimension * 0.08f)
                         drawLine(plusColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), strokeWidth = sw)
                         drawLine(plusColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), strokeWidth = sw)
                     }
+                } else {
+                    // 非加号变体:框内显示字符(如"满")
+                    BasicText(
+                        text = boxLabel,
+                        style = TextStyle(
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = with(LocalDensity.current) { (iconSize * 0.45f).toSp() },
+                            fontWeight = FontWeight.Light,
+                        ),
+                    )
                 }
             }
             Spacer(Modifier.width(if (landscape) 18.dp else 16.dp))
@@ -839,7 +849,7 @@ fun AppList(
                         landscape = landscape,
                         onClick = null,
                         text = "桌面已满",
-                        showPlus = false,
+                        boxLabel = "满",
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(rowHeight)
