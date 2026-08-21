@@ -240,7 +240,7 @@ internal val textShadow = Shadow(
 /**
  * 名称角标的垂直偏移(相对名称行框顶部,向下为正):贴最后一个字母的视觉顶部。
  * Roboto 度量近似:小写 x-height ≈ 0.40em 低于行框顶,大写/数字 ≈ 0.23em,CJK 近顶 ≈ 0.08em;
- * 再上收 4dp 让圆点轻叠在字母角上。
+ * 再上收 6dp 让圆点轻叠在字母角上(太矮的用户反馈:上收从 4dp 加大到 6dp)。
  */
 @Composable
 internal fun badgeTopShiftDp(fontSize: TextUnit, name: String): Dp {
@@ -250,7 +250,7 @@ internal fun badgeTopShiftDp(fontSize: TextUnit, name: String): Dp {
         else -> 0.08f
     }
     val density = LocalDensity.current
-    return with(density) { (fontSize.toPx() * em - 4.dp.toPx()).toDp() }
+    return with(density) { (fontSize.toPx() * em - 6.dp.toPx()).toDp() }
 }
 
 /**
@@ -300,7 +300,7 @@ fun AppRow(
                     badgeCount,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = badgeTopShiftDp(fontSize, name)),
+                        .offset(x = 6.dp, y = badgeTopShiftDp(fontSize, name)),
                 )
             }
         }
@@ -759,7 +759,7 @@ fun AppList(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .offset(
-                                            x = 4.dp,
+                                            x = 6.dp,
                                             y = badgeTopShiftDp(fontSize, item.displayName),
                                         ),
                                 )
