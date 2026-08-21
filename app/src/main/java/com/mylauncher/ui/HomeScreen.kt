@@ -140,7 +140,11 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 if (knownRecordMs == 0) knownRecordMs = store.data.first().fastestKnockGapMs
                 val isNewRecord = knownRecordMs == 0 || ms < knownRecordMs
                 store.setFastestKnockGapMs(ms)
-                if (isNewRecord) knownRecordMs = ms
+                if (isNewRecord) {
+                    knownRecordMs = ms
+                    // 最近一次破纪录:上传榜单提交此值(当时破纪录的手速,允许同用户多条上榜)
+                    store.setLatestKnockGapMs(ms)
+                }
                 if (isNewRecord) {
                     // x% 来自 GET /percentile(后端未上线/失败/0 时回退基础文案)
                     val rate = 1000f / ms
@@ -644,6 +648,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                     autoMeritEnabled = data.autoMeritEnabled,
                     autoMeritMaxS = data.autoMeritMaxS,
                     fastestKnockGapMs = data.fastestKnockGapMs,
+                    latestKnockGapMs = data.latestKnockGapMs,
                     meritPeak = data.meritPeak,
                     leaderboardNickname = data.leaderboardNickname,
                     onLeaderboardNickname = { scope.launch { store.setLeaderboardNickname(it) } },

@@ -41,6 +41,8 @@ data class HomeData(
     val meritPeak: Int,
     /** 最快连击手速纪录(两次敲击的最小间隔 ms,0 = 暂无)。 */
     val fastestKnockGapMs: Int,
+    /** 最近一次破纪录的间隔 ms(0 = 暂无);上传榜单用它,允许同一用户多条上榜记录。 */
+    val latestKnockGapMs: Int,
     /** 排行榜昵称(本地持久化,20b 输入框写入;空白 = 未设置)。 */
     val leaderboardNickname: String,
     val easterEggEnabled: Boolean,
@@ -104,6 +106,8 @@ class HomeStore(private val context: Context) {
         /** 功德按日历史(每行 "日期 计数",保留最近 365 天)——总功德/每日统计的数据基础。 */
         private val KEY_MERIT_HISTORY = stringPreferencesKey("merit_history")
         private val KEY_FASTEST_KNOCK = intPreferencesKey("fastest_knock_gap_ms")
+        /** 最近一次破纪录的手速间隔(每次破纪录覆盖,上传用:提交"当时破纪录的手速"而非历史最高)。 */
+        private val KEY_LATEST_KNOCK = intPreferencesKey("latest_knock_gap_ms")
         /** 排行榜昵称(20b 昵称输入框读写)。 */
         private val KEY_LEADERBOARD_NICKNAME = stringPreferencesKey("leaderboard_nickname")
         private const val MERIT_HISTORY_DAYS = 365
@@ -153,6 +157,7 @@ class HomeStore(private val context: Context) {
             meritHistory = merit.history,
             meritPeak = merit.history.values.maxOrNull() ?: 0,
             fastestKnockGapMs = p[KEY_FASTEST_KNOCK] ?: 0,
+            latestKnockGapMs = p[KEY_LATEST_KNOCK] ?: 0,
             leaderboardNickname = p[KEY_LEADERBOARD_NICKNAME] ?: "",
             easterEggEnabled = p[KEY_EASTER_EGG] ?: false,
             easterEggUnlocked = p[KEY_EASTER_UNLOCKED] ?: false,
@@ -297,6 +302,11 @@ class HomeStore(private val context: Context) {
             val cur = it[KEY_FASTEST_KNOCK] ?: 0
             if (cur == 0 || value < cur) it[KEY_FASTEST_KNOCK] = value
         }
+    }
+
+    /** 最近一次破纪录的间隔 ms(每次破纪录都覆盖写入;上传提交此值,允许同用户多条上榜)。 */
+    suspend fun setLatestKnockGapMs(value: Int) {
+        context.homeDataStore.edit { it[KEY_LATEST_KNOCK] = value }
     }
 
     /** 排行榜昵称:去空白 + 限 16 字符(与榜单契约一致)。 */

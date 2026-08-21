@@ -98,6 +98,7 @@ fun SettingsScreen(
     autoMeritEnabled: Boolean,
     autoMeritMaxS: Int,
     fastestKnockGapMs: Int,
+    latestKnockGapMs: Int,
     meritPeak: Int,
     leaderboardNickname: String,
     onLeaderboardNickname: (String) -> Unit,
@@ -325,6 +326,7 @@ fun SettingsScreen(
                     // 手速分享图按钮移入小节下方(20a 组件,复用 ShareImageActivity)
                     LeaderboardSection(
                         fastestKnockGapMs = fastestKnockGapMs,
+                        latestKnockGapMs = latestKnockGapMs,
                         nickname = leaderboardNickname,
                         onNicknameChange = onLeaderboardNickname,
                     )
@@ -547,13 +549,14 @@ private sealed interface LbState {
 
 /**
  * 设置页彩蛋组「手速排行榜」小节:
- * 昵称输入框(本地持久化,首启自动生成随机名零摩擦) / 上传按钮(gapMs>=40 && 会话连击 samples>=10 才可用)
+ * 昵称输入框(本地持久化,首启自动生成随机名零摩擦) / 上传按钮(有纪录即可用,提交最近一次破纪录的手速)
  * / 榜单 top10(名次·昵称·次每秒,自己高亮) / 「我的名次」行 / 隐私说明 / 生成分享图入口(20a 组件)。
  * 网络失败静默降级:榜单显示「加载失败,点击重试」;上传失败 Toast 提示。
  */
 @Composable
 private fun LeaderboardSection(
     fastestKnockGapMs: Int,
+    latestKnockGapMs: Int,
     nickname: String,
     onNicknameChange: (String) -> Unit,
 ) {
@@ -610,7 +613,8 @@ private fun LeaderboardSection(
     // 上传按钮:有历史纪录即可上传,不设连击次数门槛 —— 旧的 samples>=10 是服务端
     // 门槛放开后遗留的客户端限制,破纪录弹窗→设置页还要再敲 10 次才可传,割裂(修过的坑);
     // 服务端靠 rate/gapMs 互验兜底伪造,样本数仅随成绩提交
-    val gapMs = fastestKnockGapMs
+    // 上传最近一次破纪录的手速(允许同一用户多条上榜记录);无最近纪录(老数据)回退历史最高
+    val gapMs = latestKnockGapMs.takeIf { it > 0 } ?: fastestKnockGapMs
     val samples = KnockSound.samples
     val canUpload = gapMs > 0 && !lbUploading
     TextButton(
