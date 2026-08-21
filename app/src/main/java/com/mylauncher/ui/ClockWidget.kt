@@ -1,15 +1,20 @@
 package com.mylauncher.ui
 
 import android.util.Log
+import android.content.Intent
+import android.provider.AlarmClock
+import android.provider.CalendarContract
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,12 +26,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -111,13 +118,22 @@ fun ClockWidget(
             Modifier.fillMaxWidth(),
             horizontalAlignment = if (landscape) Alignment.Start else Alignment.CenterHorizontally,
         ) {
+            // 点击时间打开时间应用(闹钟/时钟),点击日期打开日历应用;无对应应用时静默
+            val context = LocalContext.current
             BasicText(
                 text = time,
-                modifier = Modifier.onGloballyPositioned {
-                    val pos = it.positionInWindow()
-                    timeAnchorX = pos.x + it.size.width / 2f
-                    timeAnchorY = pos.y  // 锚点 = 时间文字顶部
-                },
+                modifier = Modifier
+                    .onGloballyPositioned {
+                        val pos = it.positionInWindow()
+                        timeAnchorX = pos.x + it.size.width / 2f
+                        timeAnchorY = pos.y  // 锚点 = 时间文字顶部
+                    }
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        runCatching {
+                            context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+                        }
+                    },
                 style = TextStyle(
                     color = Color.White,
                     fontSize = timeSize.sp,
@@ -129,6 +145,15 @@ fun ClockWidget(
             Spacer(Modifier.height(if (landscape) 6.dp else 10.dp))
             BasicText(
                 text = date,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW).setData(CalendarContract.CONTENT_URI)
+                            )
+                        }
+                    },
                 style = TextStyle(
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = dateSize.sp,

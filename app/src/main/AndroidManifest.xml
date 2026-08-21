@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
+    <!-- 点击时间打开时间应用:OPPO 等 ROM 的闹钟入口要求调用方持有 SET_ALARM(普通权限) -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
     <!-- 手速排行榜(20b):上传/拉取榜单需要网络;仅上报昵称与成绩,无设备标识 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
