@@ -67,7 +67,9 @@ fun RenameDialog(
             Spacer(Modifier.height(16.dp))
             BasicTextField(
                 value = value,
-                onValueChange = { if (it.length <= 12) value = it },
+                // 不设长度上限:长名称(如 ReVanced Manager Plus)被旧 12 字符上限锁死
+                // 无法编辑(哪怕删一个字也被拒,输入框像冻结)——行显示有省略号兜底
+                onValueChange = { value = it },
                 singleLine = true,
                 textStyle = TextStyle(
                     color = Color(0xFF1E1E22),

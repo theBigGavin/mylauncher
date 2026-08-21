@@ -307,17 +307,25 @@ fun AppRow(
     }
 }
 
-/** "＋ 添加应用" 行:虚线框 + 加号,细体白色 70% 名称。 */
+/**
+ * 列表尾部提示行:"＋ 添加应用"(可点)与"桌面已满"(不可点,槽位用尽时提示)共用:
+ * 虚线框 + 可选的加号,细体白色 70% 名称。
+ */
 @Composable
 private fun AddRow(
     iconSize: Dp,
     fontSize: TextUnit,
     showIcons: Boolean,
     landscape: Boolean,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
+    text: String = "添加应用",
+    showPlus: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         if (landscape) {
             Spacer(Modifier.weight(1f))
         }
@@ -340,16 +348,18 @@ private fun AddRow(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Canvas(Modifier.size(iconSize * 0.5f)) {
-                    val sw = maxOf(1.5f, size.minDimension * 0.08f)
-                    drawLine(plusColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), strokeWidth = sw)
-                    drawLine(plusColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), strokeWidth = sw)
+                if (showPlus) {
+                    Canvas(Modifier.size(iconSize * 0.5f)) {
+                        val sw = maxOf(1.5f, size.minDimension * 0.08f)
+                        drawLine(plusColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), strokeWidth = sw)
+                        drawLine(plusColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), strokeWidth = sw)
+                    }
                 }
             }
             Spacer(Modifier.width(if (landscape) 18.dp else 16.dp))
         }
         BasicText(
-            text = "添加应用",
+            text = text,
             style = TextStyle(
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = fontSize,
@@ -797,14 +807,16 @@ fun AppList(
             }
         }
 
-        if (items.size < maxApps) {
-            item(key = "__add__") {
-                // 视觉显隐 + 高度动画:隐藏后不占视口空间,显示时淡入+展开,隐藏时淡出+收起
-                AnimatedVisibility(
-                    visible = addRowShown,
-                    enter = fadeIn(tween(280)) + expandVertically(tween(280)),
-                    exit = fadeOut(tween(280)) + shrinkVertically(tween(280)),
-                ) {
+        // 尾部行常驻:槽位未满 = 可点的"添加应用";槽位已满 = 不可点的"桌面已满"提示。
+        // 两者的出现/隐藏逻辑与缓动完全一致(拖动列表出现、3s 无操作淡出)
+        item(key = "__add__") {
+            // 视觉显隐 + 高度动画:隐藏后不占视口空间,显示时淡入+展开,隐藏时淡出+收起
+            AnimatedVisibility(
+                visible = addRowShown,
+                enter = fadeIn(tween(280)) + expandVertically(tween(280)),
+                exit = fadeOut(tween(280)) + shrinkVertically(tween(280)),
+            ) {
+                if (items.size < maxApps) {
                     AddRow(
                         iconSize = iconSize,
                         fontSize = fontSize,
@@ -816,6 +828,20 @@ fun AppList(
                             .height(rowHeight)
                             // 横屏与普通行一致用 12dp;竖屏用主屏行边距 PORTRAIT_ROW_MARGIN
                             // (横屏曾误用 80dp 导致"添加应用"名称被裁掉)
+                            .padding(horizontal = if (landscape) 12.dp else PORTRAIT_ROW_MARGIN),
+                    )
+                } else {
+                    AddRow(
+                        iconSize = iconSize,
+                        fontSize = fontSize,
+                        showIcons = showIcons,
+                        landscape = landscape,
+                        onClick = null,
+                        text = "桌面已满",
+                        showPlus = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(rowHeight)
                             .padding(horizontal = if (landscape) 12.dp else PORTRAIT_ROW_MARGIN),
                     )
                 }
