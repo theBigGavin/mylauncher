@@ -728,6 +728,12 @@ fun AppList(
                             overflow = TextOverflow.Ellipsis,
                             modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
                         )
+                        // 关闭图标显示时,通知角标挂到名称旁(与抽屉/选择器同款)——桌面行是内联行,
+                        // 不能只改共用 AppRow,这里单独加(修过的坑)
+                        if (!showIcons && showBadges && (badgeCounts[item.app.badgeKey] ?: 0) > 0) {
+                            Spacer(Modifier.width(6.dp))
+                            BadgeDot(badgeCounts[item.app.badgeKey] ?: 0)
+                        }
                     }
                 }
                 // 操作按钮层:必须画在内容层之上(后绘 = 命中优先)——内容层 fillMaxSize 即使透明也会挡按钮的点击(修过的坑);
