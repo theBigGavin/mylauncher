@@ -209,10 +209,10 @@ internal fun IconBox(icon: ImageBitmap?, size: Dp, badgeCount: Int) {
 
 /** 通知角标圆点:红底圆 + 白色数字(99+ 截断),与 IconBox 角标同款视觉。 */
 @Composable
-internal fun BadgeDot(badgeCount: Int, size: Dp = 14.dp) {
+internal fun BadgeDot(badgeCount: Int, size: Dp = 14.dp, modifier: Modifier = Modifier) {
     if (badgeCount <= 0) return
     Box(
-        Modifier
+        modifier
             .size(size)
             .clip(CircleShape)
             .background(Color(0xFFFF3D00)),
@@ -262,25 +262,31 @@ fun AppRow(
             IconBox(icon, iconSize, badgeCount)
             Spacer(Modifier.width(if (landscape) 18.dp else 16.dp))
         }
-        BasicText(
-            text = name,
-            style = TextStyle(
-                color = nameColor,
-                fontSize = fontSize,
-                fontWeight = nameWeight,
-                letterSpacing = 0.5.sp,
-                lineHeight = fontSize * 1.1f,
-                textAlign = if (landscape) TextAlign.End else TextAlign.Start,
-                shadow = textShadow,
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
-        )
-        // 关闭图标显示时,通知角标挂到名称右侧 —— 气泡不随图标一起消失,通知入口不丢失
-        if (!showIcons && badgeCount > 0) {
-            Spacer(Modifier.width(6.dp))
-            BadgeDot(badgeCount)
+        // 关闭图标显示时,通知角标叠在名称右上角(所有地方一致)——气泡不随图标一起消失
+        Box {
+            BasicText(
+                text = name,
+                style = TextStyle(
+                    color = nameColor,
+                    fontSize = fontSize,
+                    fontWeight = nameWeight,
+                    letterSpacing = 0.5.sp,
+                    lineHeight = fontSize * 1.1f,
+                    textAlign = if (landscape) TextAlign.End else TextAlign.Start,
+                    shadow = textShadow,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
+            )
+            if (!showIcons && badgeCount > 0) {
+                BadgeDot(
+                    badgeCount,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 4.dp, y = (-4).dp),
+                )
+            }
         }
     }
 }
@@ -713,26 +719,32 @@ fun AppList(
                             )
                             Spacer(Modifier.width(if (landscape) 18.dp else 16.dp))
                         }
-                        BasicText(
-                            text = item.displayName,
-                            style = TextStyle(
-                                color = Color.White,
-                                fontSize = fontSize,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.5.sp,
-                                lineHeight = fontSize * 1.1f,
-                                textAlign = if (landscape) TextAlign.End else TextAlign.Start,
-                                shadow = textShadow,
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
-                        )
-                        // 关闭图标显示时,通知角标挂到名称旁(与抽屉/选择器同款)——桌面行是内联行,
+                        // 关闭图标显示时,角标叠在名称右上角(与抽屉/选择器同款)——桌面行是内联行,
                         // 不能只改共用 AppRow,这里单独加(修过的坑)
-                        if (!showIcons && showBadges && (badgeCounts[item.app.badgeKey] ?: 0) > 0) {
-                            Spacer(Modifier.width(6.dp))
-                            BadgeDot(badgeCounts[item.app.badgeKey] ?: 0)
+                        Box {
+                            BasicText(
+                                text = item.displayName,
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = fontSize,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.5.sp,
+                                    lineHeight = fontSize * 1.1f,
+                                    textAlign = if (landscape) TextAlign.End else TextAlign.Start,
+                                    shadow = textShadow,
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
+                            )
+                            if (!showIcons && showBadges && (badgeCounts[item.app.badgeKey] ?: 0) > 0) {
+                                BadgeDot(
+                                    badgeCounts[item.app.badgeKey] ?: 0,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 4.dp, y = (-4).dp),
+                                )
+                            }
                         }
                     }
                 }
