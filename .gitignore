@@ -18,3 +18,6 @@ docs/screenshots/
 .DS_Store
 keystore.properties
 *.jks
+
+# knock 服务端运行时数据(SQLite/pid/log, 不入库)
+server/data/
