@@ -207,6 +207,29 @@ internal fun IconBox(icon: ImageBitmap?, size: Dp, badgeCount: Int) {
     }
 }
 
+/** 通知角标圆点:红底圆 + 白色数字(99+ 截断),与 IconBox 角标同款视觉。 */
+@Composable
+internal fun BadgeDot(badgeCount: Int, size: Dp = 14.dp) {
+    if (badgeCount <= 0) return
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color(0xFFFF3D00)),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicText(
+            text = if (badgeCount > 99) "99+" else "$badgeCount",
+            style = TextStyle(
+                color = Color.White,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 8.sp,
+            ),
+        )
+    }
+}
+
 /** 白字深色光晕:让文字从壁纸亮线里"立"出来。 */
 internal val textShadow = Shadow(
     color = Color.Black.copy(alpha = 0.5f),
@@ -254,6 +277,11 @@ fun AppRow(
             overflow = TextOverflow.Ellipsis,
             modifier = if (landscape) Modifier.width(with(LocalDensity.current) { (fontSize * 5.5f).toDp() }) else Modifier,
         )
+        // 关闭图标显示时,通知角标挂到名称右侧 —— 气泡不随图标一起消失,通知入口不丢失
+        if (!showIcons && badgeCount > 0) {
+            Spacer(Modifier.width(6.dp))
+            BadgeDot(badgeCount)
+        }
     }
 }
 

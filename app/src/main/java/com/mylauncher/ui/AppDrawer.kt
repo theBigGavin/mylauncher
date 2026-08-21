@@ -90,6 +90,8 @@ fun AppDrawer(
     customOffsetY: Float,
     favorites: Set<String>,
     showSystem: Boolean,
+    badgeCounts: Map<String, Int> = emptyMap(),
+    showBadges: Boolean = false,
     onShowSystemChange: (Boolean) -> Unit,
     onLaunch: (AppEntry) -> Unit,
     onAddToHome: (AppEntry) -> Unit,
@@ -110,6 +112,8 @@ fun AppDrawer(
         customOffsetX = customOffsetX,
         customOffsetY = customOffsetY,
         favorites = favorites,
+        badgeCounts = badgeCounts,
+        showBadges = showBadges,
         onToggleFavorite = onToggleFavorite,
         showSystem = showSystem,
         onShowSystemChange = onShowSystemChange,
@@ -203,6 +207,9 @@ internal fun AppListOverlay(
     onToggleFavorite: ((AppEntry) -> Unit)? = null,
     showSystem: Boolean = false,
     onShowSystemChange: (Boolean) -> Unit = {},
+    // 通知角标:默认不显示(选择器替换用无角标),抽屉传入计数与开关后行内显示
+    badgeCounts: Map<String, Int> = emptyMap(),
+    showBadges: Boolean = false,
 ) {
     BackHandler(onBack = onDismiss)
     // 系统应用显示开关:初始值来自持久化设置,用户切换后回写(记住用户习惯)
@@ -349,6 +356,7 @@ internal fun AppListOverlay(
                                 fontSize = fontSize,
                                 showIcons = showIcons,
                                 landscape = false,
+                                badgeCount = if (showBadges) (badgeCounts[app.badgeKey] ?: 0) else 0,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(
@@ -510,6 +518,7 @@ internal fun AppListOverlay(
                                     fontSize = fontSize,
                                     showIcons = showIcons,
                                     landscape = config.screenWidthDp > config.screenHeightDp,
+                                    badgeCount = if (showBadges) (badgeCounts[app.badgeKey] ?: 0) else 0,
                                 )
                             }
                             // 右侧操作按钮:必须画在内容层之上(后绘 = 命中优先),
