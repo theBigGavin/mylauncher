@@ -23,8 +23,7 @@
     <string name="lb_uploading">Uploading…</string>
     <string name="lb_upload_ok">On the board: #%1$d (%2$d players)</string>
     <string name="lb_upload_failed">Upload failed, please retry</string>
-    <string name="lb_upload_hint">Knock 10+ times to upload</string>
-    <string name="lb_rate_abnormal">Abnormal score, cannot upload</string>
+    <string name="lb_upload_need_record">Knock out a record first, then upload</string>
     <string name="lb_privacy">Only your nickname and speed are uploaded</string>
     <string name="lb_loading">Loading…</string>
     <string name="lb_load_failed">Load failed — tap to retry</string>
