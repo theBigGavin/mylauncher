@@ -238,6 +238,22 @@ internal val textShadow = Shadow(
 )
 
 /**
+ * 名称角标的垂直偏移(相对名称行框顶部,向下为正):贴最后一个字母的视觉顶部。
+ * Roboto 度量近似:小写 x-height ≈ 0.40em 低于行框顶,大写/数字 ≈ 0.23em,CJK 近顶 ≈ 0.08em;
+ * 再上收 4dp 让圆点轻叠在字母角上。
+ */
+@Composable
+internal fun badgeTopShiftDp(fontSize: TextUnit, name: String): Dp {
+    val em = when (name.lastOrNull()) {
+        in 'a'..'z' -> 0.40f
+        in 'A'..'Z', in '0'..'9' -> 0.23f
+        else -> 0.08f
+    }
+    val density = LocalDensity.current
+    return with(density) { (fontSize.toPx() * em - 4.dp.toPx()).toDp() }
+}
+
+/**
  * 单行:白色 900 字重名称 + 单色化图标。
  * 不再强制占满行宽 —— 由调用方决定对齐与占位(手势区域 = 内容本身)。
  */
@@ -284,7 +300,7 @@ fun AppRow(
                     badgeCount,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-4).dp),
+                        .offset(x = 4.dp, y = badgeTopShiftDp(fontSize, name)),
                 )
             }
         }
@@ -742,7 +758,10 @@ fun AppList(
                                     badgeCounts[item.app.badgeKey] ?: 0,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .offset(x = 4.dp, y = (-4).dp),
+                                        .offset(
+                                            x = 4.dp,
+                                            y = badgeTopShiftDp(fontSize, item.displayName),
+                                        ),
                                 )
                             }
                         }
