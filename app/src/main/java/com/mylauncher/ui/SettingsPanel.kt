@@ -607,12 +607,12 @@ private fun LeaderboardSection(
         }
     }
 
-    // 上传按钮:读历史最快纪录 + 会话连击样本数(不足置灰并提示)。
-    // 纪录存在即可上传(Gavin 2026-08-19:完全放开下限,娱乐榜)——客户端防重入
-    // 下限 20ms 保证 App 产出的纪录天然 ≥20ms,服务端靠 rate/gapMs 互验兜底伪造
+    // 上传按钮:有历史纪录即可上传,不设连击次数门槛 —— 旧的 samples>=10 是服务端
+    // 门槛放开后遗留的客户端限制,破纪录弹窗→设置页还要再敲 10 次才可传,割裂(修过的坑);
+    // 服务端靠 rate/gapMs 互验兜底伪造,样本数仅随成绩提交
     val gapMs = fastestKnockGapMs
     val samples = KnockSound.samples
-    val canUpload = gapMs > 0 && samples >= 10 && !lbUploading
+    val canUpload = gapMs > 0 && !lbUploading
     TextButton(
         text = if (lbUploading) context.getString(R.string.lb_uploading)
         else context.getString(R.string.lb_upload),
@@ -644,11 +644,10 @@ private fun LeaderboardSection(
         enabled = canUpload,
         strong = false,
     )
-    // 不足门槛提示(仅置灰时显示,按原因区分)+ 隐私说明(常显)
+    // 尚无纪录提示(唯一置灰原因:还没敲出过纪录)+ 隐私说明(常显)
     if (!canUpload && !lbUploading) {
         BasicText(
-            text = if (samples < 10) context.getString(R.string.lb_upload_hint)
-            else context.getString(R.string.lb_rate_abnormal),
+            text = context.getString(R.string.lb_upload_need_record),
             modifier = Modifier.padding(top = 2.dp),
             style = TextStyle(
                 color = Color.White.copy(alpha = 0.45f),

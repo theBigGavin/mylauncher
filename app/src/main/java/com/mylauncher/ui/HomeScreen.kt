@@ -107,7 +107,6 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
     var showRecordDialog by remember { mutableStateOf(false) }
     var recordPercentile by remember { mutableStateOf<String?>(null) }
     var recordRateText by remember { mutableStateOf("") }
-    var recordShownThisSession by remember { mutableStateOf(false) }
 
     // 通知角标兜底:部分 ROM 会丢通知回调(角标停在旧值/清零),ON_RESUME 与可见期间周期重算
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -131,7 +130,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         // 会话开始时已知的历史纪录:破纪录弹窗的比较基准(首次纪录=0 也视为刷新)
         knownRecordMs = store.data.first().fastestKnockGapMs
     }
-    // 连击手速纪录:刷新历史纪录时持久化;打破纪录(含首次)弹窗一次,会话内不重复打扰
+    // 连击手速纪录:刷新历史纪录时持久化;每次打破纪录(含首次)都弹窗
     DisposableEffect(Unit) {
         KnockSound.onFastestKnock = { ms ->
             scope.launch {
@@ -142,8 +141,7 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
                 val isNewRecord = knownRecordMs == 0 || ms < knownRecordMs
                 store.setFastestKnockGapMs(ms)
                 if (isNewRecord) knownRecordMs = ms
-                if (isNewRecord && !recordShownThisSession) {
-                    recordShownThisSession = true
+                if (isNewRecord) {
                     // x% 来自 GET /percentile(后端未上线/失败/0 时回退基础文案)
                     val rate = 1000f / ms
                     val p = withContext(Dispatchers.IO) { LeaderboardApi.fetchPercentile(rate) }
@@ -774,8 +772,8 @@ fun HomeScreen(innerDisplayUnfolded: Boolean = false) {
         }
     }
 
-    // 破纪录弹窗(20b):打破历史纪录(含首次)时弹出;「分享到全球榜单」打开设置页排行榜小节上传,
-    // 「生成分享图」跳 20a ShareImageActivity(带昵称);可关闭,会话内只弹一次(防打扰)
+    // 破纪录弹窗(20b):每次打破历史纪录(含首次)都弹出;「分享到全球榜单」打开设置页排行榜小节上传,
+    // 「生成分享图」跳 20a ShareImageActivity(带昵称);可关闭
     if (showRecordDialog) {
         RecordDialog(
             rateText = recordRateText,
