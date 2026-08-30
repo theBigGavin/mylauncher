@@ -55,6 +55,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 APKs are published on the [Releases page](https://github.com/theBigGavin/mylauncher/releases) — the latest is **v1.8.2**. Versioning follows semantic versioning `major.minor.patch` (major = breaking change / milestone, minor = new feature, patch = bug fix); `versionCode` increments monotonically with every release.
 
+> ⚠️ **Feature freeze (2026-08-30, OPC governance [0830-gov-3])** — MyLauncher is in **maintenance-only mode**: no *new features* until further notice. Bug fixes, security patches, and release engineering (versionCode bumps, release builds) continue; the launcher stays usable and on the store. [gold-monitor](https://github.com/theBigGavin/gold-monitor) remains active as the req-001 paid hook.
+
 ## 🗂️ Project structure
 
 ```
@@ -62,6 +64,25 @@ app/src/main/java/com/mylauncher/   # Source code (data / icons / ui)
 design/                             # Mockups & render scripts (mockup.html is an interactive prototype)
 docs/                               # Notes & screenshots
 ```
+
+## 🔗 Share & attribution
+
+When sharing MyLauncher through external channels, use the short link with UTM parameters so we can trace where the stars come from:
+
+- Short link: https://www.hermes.cc.cd/go/mylauncher
+- Trackable target: `https://github.com/theBigGavin/mylauncher?utm_source=shortlink&utm_medium=signature&utm_campaign=mylauncher`
+
+If you post directly instead of using the short link, append the matching `utm_source` to the repo URL:
+
+| Channel | Recommended share URL |
+|---|---|
+| dev.to | `https://github.com/theBigGavin/mylauncher?utm_source=devto&utm_medium=comment&utm_campaign=mylauncher-launch` |
+| v2ex | `https://github.com/theBigGavin/mylauncher?utm_source=v2ex&utm_medium=comment&utm_campaign=mylauncher-launch` |
+| juejin | `https://github.com/theBigGavin/mylauncher?utm_source=juejin&utm_medium=comment&utm_campaign=mylauncher-launch` |
+| reddit | `https://github.com/theBigGavin/mylauncher?utm_source=reddit&utm_medium=post&utm_campaign=mylauncher-launch` |
+| signature / profile | `https://github.com/theBigGavin/mylauncher?utm_source=shortlink&utm_medium=signature&utm_campaign=mylauncher` |
+
+If this launcher makes you smile, a star is the cheapest merit you'll ever earn.
 
 ## 🤝 Contributing
 
