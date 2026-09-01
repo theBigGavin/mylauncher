@@ -53,7 +53,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## 📦 Releases
 
-APKs are published on the [Releases page](https://github.com/theBigGavin/mylauncher/releases) — the latest is **v1.8.2**. Versioning follows semantic versioning `major.minor.patch` (major = breaking change / milestone, minor = new feature, patch = bug fix); `versionCode` increments monotonically with every release.
+APKs are published on the [Releases page](https://github.com/theBigGavin/mylauncher/releases) — the latest is **v1.11.5**. Versioning follows semantic versioning `major.minor.patch` (major = breaking change / milestone, minor = new feature, patch = bug fix); `versionCode` increments monotonically with every release.
 
 > ⚠️ **Feature freeze (2026-08-30, OPC governance [0830-gov-3])** — MyLauncher is in **maintenance-only mode**: no *new features* until further notice. Bug fixes, security patches, and release engineering (versionCode bumps, release builds) continue; the launcher stays usable and on the store. [gold-monitor](https://github.com/theBigGavin/gold-monitor) remains active as the req-001 paid hook.
 

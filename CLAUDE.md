@@ -14,7 +14,7 @@ MyLauncher — Zune/Metro 风格的 Android 桌面(注册为系统 HOME)。竖�
 - 构建:`./gradlew :app:assembleDebug`
 - 安装:`adb install -r app/build/outputs/apk/debug/app-debug.apk`
 - 项目**没有测试**和 lint 配置,无 test source set。
-- **版本制度**:versionName 用语义化三段 `主.次.补丁`(新功能=次+1、纯修复=补丁+1);versionCode 单调 +1(本次 1.8.2 / code 42)。每次对外交付(含功能批次)必须在同一次提交里升版本号——用户会依据版本号判断是否已更新,漏升视为 bug。
+- **版本制度**:versionName 用语义化三段 `主.次.补丁`(新功能=次+1、纯修复=补丁+1);versionCode 单调 +1(本次 1.11.5 / code 60)。每次对外交付(含功能批次)必须在同一次提交里升版本号——用户会依据版本号判断是否已更新,漏升视为 bug。
 - **发版流程(红线,详见 docs/release-policy.md)**:release 包发布一律由 Gavin 本人执行,AI/agent 不执行 `./gradlew :app:assembleRelease`、不打 tag、不 `gh release create`。AI 职责边界:只改代码 + 同一次提交里升版本号 + `git commit && git push origin main`;交付说明写清版本号即可,由 Gavin 编译签名发布。原因:release 签名密钥库只在 Gavin 机器上,AI 侧无密钥库,assembleRelease 会产出 debug 签名包,无法覆盖安装正式签名的旧版本(丢数据)。
 - 设计工具链:`design/render_mockup.py`(PIL 渲染效果图,依赖 Python + Pillow);`design/mockup.html` 为可交互原型,浏览器直接打开。
 
